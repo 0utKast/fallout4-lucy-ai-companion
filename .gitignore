@@ -1,0 +1,18 @@
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Runtime logs & generated local caches
+**/bridge/logs/
+**/bridge/state/barks_cache_*/
+**/bridge/state/lore_index.sqlite
+**/bridge/state/*.json
+**/bridge/models/
+**/bridge/voice_samples/
+**/papyrus_out/
+**/assets/
+*.log
+*.jsonl

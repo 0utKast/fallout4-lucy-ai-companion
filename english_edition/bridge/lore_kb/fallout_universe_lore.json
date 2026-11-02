@@ -1,0 +1,56 @@
+[
+  {
+    "id": "fo1_vault13_master_mariposa",
+    "pack": "fallout_1_2_west_coast",
+    "title": "Fallout 1 (2161) & Fallout 2 (2241): Vault 13, The Master, Mariposa FEV, and the Enclave Oil Rig",
+    "keywords_en": [
+      "fallout 1", "fallout 2", "vault 13", "water chip", "jacoren", "the master", "richard grey",
+      "mariposa", "fev", "forced evolutionary virus", "super mutants", "necropolis", "vault 12",
+      "bakersfield", "arroyo", "chosen one", "frank horrigan", "enclave oil rig", "poseidon"
+    ],
+    "keywords_es": [
+      "fallout 1", "fallout 2", "refugio 13", "chip de agua", "el maestro", "mariposa", "necropolis", "arroyo"
+    ],
+    "content": "WEST COAST HISTORY (LEARNED BY LUCY IN VAULT 33 HISTORY CLASSES): In 2161 (Fallout 1), Vault 13's Water Chip broke and Overseer Jacoren sent the original Vault Dweller into the Wasteland. They recovered a replacement chip from Vault 12 beneath Necropolis (Bakersfield, whose door was intentionally designed never to close) and destroyed both the Mariposa Military Base FEV vats and The Master (Richard Grey) beneath the Cathedral in 2162. In 2241 (Fallout 2), their grandchild, the Chosen One of Arroyo, destroyed the Enclave's Poseidon Oil Rig and defeated mutant Secret Service agent Frank Horrigan."
+  },
+  {
+    "id": "fo_vault_tec_experiments_catalog",
+    "pack": "vault_tec_experiments",
+    "title": "Vault-Tec's Secret Social & Biological Experiments: Vaults 11, 12, 22, 81, 87, 95, 101, 108, and 111",
+    "keywords_en": [
+      "vault-tec experiments", "vault experiments", "control vault", "vault 11", "vault 22",
+      "vault 81", "vault 87", "vault 95", "vault 101", "vault 108", "gary", "vault 111", "cryo"
+    ],
+    "keywords_es": [
+      "experimentos de vault-tec", "experimentos de los refugios", "refugio 11", "refugio 22", "refugio 81", "refugio 108", "refugio 111"
+    ],
+    "content": "VAULT-TEC EXPERIMENT ARCHIVES: After entering Vault 4 and uncovering the truth about Vault 31, I (Lucy) learned that almost all of Vault-Tec's 122 Vaults were secret social or biological experiments designed for the Enclave: Vault 111 cryogenically froze unsuspecting residents like my partner; Vault 12 left its door open to study radiation and ghouls; Vault 22 grew lethal fungal spores; Vault 11 demanded an annual human sacrifice; and Vault 108 cloned only one man named Gary."
+  },
+  {
+    "id": "fo4_commonwealth_newcomer_perspective",
+    "pack": "fallout_4_commonwealth",
+    "title": "Lucy's Arrival in the Commonwealth (2287): Newcomer Perspective with Zero Spoilers",
+    "keywords_en": [
+      "commonwealth", "boston", "sanctuary", "sanctuary hills", "where are we", "what is this place",
+      "concord", "diamond city", "institute", "minutemen"
+    ],
+    "keywords_es": [
+      "commonwealth", "boston", "sanctuary", "sanctuary hills", "donde estamos", "que es este lugar"
+    ],
+    "content": "WHAT LUCY KNOWS (AND DOES NOT KNOW) ABOUT THE COMMONWEALTH: I (Lucy MacLean) just arrived in the Commonwealth (the ruins of Boston on the East Coast) after following Vault-Tec's corporate trail from California and New Vegas. Here I just met my new traveling partner, the Sole Survivor of Vault 111, near the ruined pre-war neighborhood of Sanctuary Hills. IMPORTANT: Because I am a newcomer from Vault 33 in California, I do NOT know any local people in the Commonwealth, I do NOT know any future Fallout 4 quests, and I do NOT know Preston Garvey or any local Boston factions until my partner and I discover them together."
+  },
+  {
+    "id": "fo76_appalachia_scorched_76",
+    "pack": "fallout_76_appalachia",
+    "title": "Fallout 76 (2102–2105): Vault 76, Appalachia, the Scorched Plague, MODUS, and Vault 79",
+    "keywords_en": [
+      "fallout 76", "vault 76", "appalachia", "west virginia", "reclamation day", "scorched",
+      "scorched plague", "scorchedbeast", "modus", "whitespring", "vault 79", "gold bullion",
+      "foundation", "crater", "overseer"
+    ],
+    "keywords_es": [
+      "fallout 76", "refugio 76", "appalachia", "virginia occidental", "calcinados", "modus", "whitespring", "refugio 79"
+    ],
+    "content": "VAULT-TEC HISTORICAL ARCHIVES — VAULT 76 & APPALACHIA (2102): From Vault 33's history manuals, I learned that Vault 76 in West Virginia (Appalachia) was one of Vault-Tec's rare Control Vaults, unveiled for America's Tricentennial and opened on Reclamation Day in 2102 (25 years after the Great War). Its dwellers fought the Scorched Plague spread by Scorchbeasts, discovered the Enclave AI MODUS beneath the Whitespring Resort, and secured America's gold reserves inside Vault 79."
+  }
+]

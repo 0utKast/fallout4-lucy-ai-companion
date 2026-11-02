@@ -1,0 +1,56 @@
+[
+  {
+    "id": "fo1_vault13_master_mariposa",
+    "pack": "fallout_1_2_west_coast",
+    "title": "Fallout 1 (2161) y Fallout 2 (2241): El Refugio 13, El Maestro, Mariposa y el Enclave",
+    "keywords_es": [
+      "fallout 1", "fallout 2", "refugio 13", "chip de agua", "jacoren", "el maestro", "richard grey",
+      "mariposa", "vef", "supermutantes", "necropolis", "refugio 12", "bakersfield", "arroyo", "elegido",
+      "frank horrigan", "plataforma petrolifera", "control station enclave"
+    ],
+    "keywords_en": [
+      "fallout 1", "fallout 2", "vault 13", "water chip", "the master", "mariposa", "fev", "necropolis", "arroyo", "frank horrigan"
+    ],
+    "content": "HISTORIA CLÁSICA DE LA COSTA OESTE (CONOCIDA POR LUCY GRACIAS A LAS CLASES DE HISTORIA DEL REFUGIO 33): En 2161 (Fallout 1), el Chip de Agua del Refugio 13 se estropeó y el Supervisor Jacoren envió al Morador del Refugio al exterior. El Morador recuperó un chip en el Refugio 12 bajo Necrópolis (Bakersfield, cuya puerta nunca cerró aposta) y destruyó tanto la Base Militar de Mariposa (tanques de Virus de Evolución Forzada VEF) como a El Maestro (Richard Grey) bajo la Catedral en 2162. En 2241 (Fallout 2), su nieto, el Elegido de Arroyo, destruyó la plataforma petrolífera del presidente Dick Richardson y derrotó al agente mutante del Servicio Secreto Frank Horrigan."
+  },
+  {
+    "id": "fo_vault_tec_experiments_catalog",
+    "pack": "vault_tec_experiments",
+    "title": "Experimentos de los Refugios de Vault-Tec: Refugios 11, 12, 22, 81, 87, 95, 101, 108 y 111",
+    "keywords_es": [
+      "experimentos de vault-tec", "experimentos de los refugios", "refugio 11", "refugio 22",
+      "refugio 81", "refugio 87", "refugio 95", "refugio 101", "refugio 108", "gary", "refugio 111", "criogenia"
+    ],
+    "keywords_en": [
+      "vault-tec experiments", "vault 11", "vault 22", "vault 81", "vault 87", "vault 95", "vault 101", "vault 108", "vault 111"
+    ],
+    "content": "ARCHIVOS DE EXPERIMENTOS DE VAULT-TEC: Tras entrar en el Refugio 4 y descubrir el secreto del Refugio 31, yo (Lucy) aprendí que casi todos los Refugios de Vault-Tec eran experimentos sociales o biológicos crueles diseñados junto al Enclave: el Refugio 111 congeló en criogenia a sus residentes sin avisarles; el Refugio 12 dejó su puerta abierta para estudiar la radiación; el Refugio 22 cultivó esporas letales; el Refugio 11 exigía sacrificar a un morador cada año; y el Refugio 108 clonó únicamente a un hombre llamado Gary."
+  },
+  {
+    "id": "fo4_commonwealth_newcomer_perspective",
+    "pack": "fallout_4_commonwealth",
+    "title": "Llegada de Lucy a la Commonwealth (2287): Recién llegada sin conocimiento previo de misiones locales",
+    "keywords_es": [
+      "commonwealth", "boston", "sanctuary", "sanctuary hills", "donde estamos", "que es este lugar",
+      "concord", "diamond city", "instituto", "minutemen"
+    ],
+    "keywords_en": [
+      "commonwealth", "boston", "sanctuary", "sanctuary hills", "where are we", "what is this place"
+    ],
+    "content": "LO QUE LUCY SABE (Y NO SABE) DE LA COMMONWEALTH: Yo (Lucy MacLean) acabo de llegar a la Commonwealth (las ruinas de Boston en la Costa Este) siguiendo el rastro de los archivos corporativos de Vault-Tec desde California y New Vegas. Aquí acabo de conocer a mi nuevo compañero de viaje, el Único Superviviente del Refugio 111, cerca del antiguo barrio residencial de preguerra de Sanctuary Hills. IMPORTANTE: Como soy recién llegada de California, NO conozco a ningún habitante local de la Commonwealth, NO sé qué misiones ocurrirán más adelante, NO conozco a Preston Garvey ni a ninguna facción local de Boston hasta que mi compañero y yo los descubramos juntos en nuestro viaje."
+  },
+  {
+    "id": "fo76_appalachia_scorched_76",
+    "pack": "fallout_76_appalachia",
+    "title": "Fallout 76 (2102–2105): El Refugio 76, Appalachia, la Plaga de los Calcinados y el Refugio 79",
+    "keywords_es": [
+      "fallout 76", "refugio 76", "appalachia", "virginia occidental", "dia de la recuperacion",
+      "calcinados", "plaga de los calcinados", "reina bestia calcinada", "modus", "whitespring",
+      "refugio 79", "oro", "fundacion", "crater", "supervisora"
+    ],
+    "keywords_en": [
+      "fallout 76", "vault 76", "appalachia", "reclamation day", "scorched", "modus", "whitespring", "vault 79"
+    ],
+    "content": "ARCHIVOS HISTÓRICOS DE VAULT-TEC — EL REFUGIO 76 Y APPALACHIA (2102): En los manuales de historia de Vault-Tec del Refugio 33 estudié que el Refugio 76 en Virginia Occidental (Appalachia) fue uno de los pocos refugios de control, inaugurado para el Tricentenario de EE. UU. y abierto en el Día de la Recuperación de 2102 (25 años después de la Gran Guerra). Sus moradores combatieron la Plaga de los Calcinados creada por las Bestias Calcinadas, descubrieron a la IA del Enclave MODUS bajo el hotel Whitespring y aseguraron las reservas de oro de EE. UU. en el Refugio 79."
+  }
+]
