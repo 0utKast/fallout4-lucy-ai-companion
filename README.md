@@ -9,6 +9,10 @@
 > **🌍 Language Navigation / Navegación de Idioma:**
 > - 🇺🇸 **[English Documentation (Complete Guide, Architecture & Installation)](#english-documentation)**
 > - 🇪🇸 **[Documentación en Español (Guía Completa, Arquitectura e Instalación)](#documentación-en-español)**
+> - 🎬 **[Watch the Real-Time In-Game Video Showcase on YouTube / Ver Vídeo de Demostración en YouTube](https://youtu.be/JSrjqPxMAB4)**
+> - 📦 **[Download on Nexus Mods (Fallout 4 Mod #110865)](https://www.nexusmods.com/fallout4/mods/110865)**
+
+[![Watch the Real-Time Showcase on YouTube](https://img.youtube.com/vi/JSrjqPxMAB4/maxresdefault.jpg)](https://youtu.be/JSrjqPxMAB4)
 
 ---
 
