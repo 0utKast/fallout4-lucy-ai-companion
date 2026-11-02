@@ -1,4 +1,4 @@
-"""Motor de Decisión 100% Local en Español vía Ollama (Modo Streaming en núcleos P de CPU sin contención de GPU)."""
+"""Motor de decisión 100% local compatible con Ollama (:11434) y KoboldCpp (:5001) con streaming por cláusulas."""
 
 import json
 import os
@@ -66,10 +66,70 @@ def _clean_partial_say(raw_escaped: str, allow_okey: bool) -> str:
     text = re.sub(r"[^\x00-\xFF¡¿«»—–’'\"…]+", "", text)
     text = re.sub(r"\s{2,}", " ", text).lstrip()
     if not allow_okey and len(text) > 12:
-        text = re.sub(r"^(¡?okey[- ]?dokey!?|¡?oki[- ]?doki!?)[!.,]?\s*", "", text, flags=re.IGNORECASE).lstrip()
+        text = re.sub(r"^(okey[- ]?dokey|oki[- ]?doki)[!.,]?\s*", "", text, flags=re.IGNORECASE).lstrip()
         if text:
             text = text[0].upper() + text[1:]
     return text
+
+
+def _stream_koboldcpp(
+    kobold_url: str,
+    messages: list[dict],
+    max_tokens: int,
+    timeout_s: float,
+    on_token: Callable[[str], None],
+) -> tuple[int, float]:
+    """Transmite tokens desde el endpoint compatible con OpenAI /v1/chat/completions de KoboldCpp."""
+    payload = {
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.55,
+        "top_p": 0.88,
+        "response_format": {"type": "json_object"},
+        "stream": True,
+    }
+    req = urllib.request.Request(
+        f"{kobold_url}/v1/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    t0 = time.perf_counter()
+    token_count = 0
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        for raw_line in resp:
+            line = raw_line.decode("utf-8", errors="replace").strip()
+            if not line:
+                continue
+            if line.startswith("data:"):
+                data_str = line[5:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    pkt = json.loads(data_str)
+                except Exception:
+                    continue
+                choices = pkt.get("choices") or []
+                if choices:
+                    delta = choices[0].get("delta") or choices[0].get("message") or {}
+                    tok = delta.get("content") or ""
+                    if tok:
+                        token_count += 1
+                        on_token(tok)
+            elif line.startswith("{"):
+                try:
+                    pkt = json.loads(line)
+                    choices = pkt.get("choices") or []
+                    if choices:
+                        msg = choices[0].get("message") or {}
+                        tok = msg.get("content") or ""
+                        if tok:
+                            token_count += max(1, len(tok.split()))
+                            on_token(tok)
+                except Exception:
+                    pass
+    dt = max(0.001, time.perf_counter() - t0)
+    return token_count, token_count / dt
 
 
 def decide(
@@ -79,8 +139,12 @@ def decide(
     timeout_s: float = 25.0,
     on_clause: Callable[[str], None] | None = None,
 ) -> Result:
-    """Genera la respuesta en streaming desde Ollama local en CPU (num_gpu=0) y emite cláusulas de voz en español."""
-    model_name = model or personas.current()["ollama_model"]
+    """Genera la respuesta en streaming desde Ollama (:11434) o KoboldCpp (:5001) y emite cláusulas de voz en español."""
+    cfg = personas.current()
+    model_name = model or cfg["ollama_model"]
+    llm_backend = cfg.get("llm_backend", "auto")
+    kobold_url = cfg.get("koboldcpp_url", "http://127.0.0.1:5001")
+
     ev = snapshot.get("event")
     is_story = ev == "campfire"
     is_chat = ev == "player_chat"
@@ -88,40 +152,19 @@ def decide(
     max_say = 850 if (is_story or is_chat) else 320
     allow_okey = bool(snapshot.get("allow_okey_dokey", False))
 
-    # Mensaje system 100% estático para que la caché KV de Ollama nunca se invalide
+    # Mensaje system 100% estático para que la caché KV nunca se invalide
     json_hint = (
         '\nResponde ÚNICAMENTE con un objeto JSON poniendo "say" PRIMERO: '
         '{"say": "...", "action": "follow", "mood": "cheerful"} '
         'donde "say" DEBE estar escrito 100% en español natural en primera persona ("yo", "mi") como Lucy MacLean del Refugio 33, '
         'respondiendo exclusivamente a lo que se te pregunta sin mezclar otros temas.'
     )
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt() + json_hint},
-            {"role": "user", "content": user_message(state, snapshot)},
-        ],
-        "format": "json",
-        "stream": True,
-        "keep_alive": -1,
-        "options": {
-            "num_gpu": 0,
-            "num_thread": 8,
-            "num_ctx": 2048,
-            "num_predict": max_tokens,
-            "temperature": 0.55,
-            "top_p": 0.88,
-        },
-    }
+    messages = [
+        {"role": "system", "content": system_prompt() + json_hint},
+        {"role": "user", "content": user_message(state, snapshot)},
+    ]
 
     started = time.perf_counter()
-    req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/chat",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
     content_parts: list[str] = []
     eval_count = 0
     eval_duration_ns = 0
@@ -130,50 +173,87 @@ def decide(
     ttfa_s = 0.0
     streamed_any = False
 
+    def _on_token(token_str: str) -> None:
+        nonlocal spoken_len, say_finished, ttfa_s, streamed_any
+        content_parts.append(token_str)
+        if on_clause is not None and not say_finished:
+            buf = "".join(content_parts)
+            m = _SAY_PARTIAL_RE.search(buf)
+            if m:
+                raw_say = m.group(1)
+                closed = m.group(2) == '"'
+                if not allow_okey and not closed and len(raw_say) < 14:
+                    return
+                clean_say = _clean_partial_say(raw_say, allow_okey)
+                while True:
+                    rem = clean_say[spoken_len:]
+                    cm = _CLAUSE_BOUNDARY_RE.match(rem)
+                    if not cm:
+                        break
+                    clause = (cm.group(1) or cm.group(3)).strip()
+                    spoken_len += len(cm.group(0))
+                    if clause:
+                        if ttfa_s == 0.0:
+                            ttfa_s = time.perf_counter() - started
+                        on_clause(clause)
+                        streamed_any = True
+                if closed:
+                    rem = clean_say[spoken_len:].strip()
+                    if rem:
+                        if ttfa_s == 0.0:
+                            ttfa_s = time.perf_counter() - started
+                        on_clause(rem)
+                        streamed_any = True
+                    say_finished = True
+
+    tps = 0.0
     try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            for raw_line in resp:
-                line = raw_line.decode("utf-8", errors="replace").strip()
-                if not line:
-                    continue
-                chunk = json.loads(line)
-                token_str = chunk.get("message", {}).get("content", "")
-                if token_str:
-                    content_parts.append(token_str)
-                    if on_clause is not None and not say_finished:
-                        buf = "".join(content_parts)
-                        m = _SAY_PARTIAL_RE.search(buf)
-                        if m:
-                            raw_say = m.group(1)
-                            closed = m.group(2) == '"'
-                            if not allow_okey and not closed and len(raw_say) < 14:
-                                pass
-                            else:
-                                clean_say = _clean_partial_say(raw_say, allow_okey)
-                                while True:
-                                    rem = clean_say[spoken_len:]
-                                    cm = _CLAUSE_BOUNDARY_RE.match(rem)
-                                    if not cm:
-                                        break
-                                    clause = (cm.group(1) or cm.group(3)).strip()
-                                    spoken_len += len(cm.group(0))
-                                    if clause:
-                                        if ttfa_s == 0.0:
-                                            ttfa_s = time.perf_counter() - started
-                                        on_clause(clause)
-                                        streamed_any = True
-                                if closed:
-                                    rem = clean_say[spoken_len:].strip()
-                                    if rem:
-                                        if ttfa_s == 0.0:
-                                            ttfa_s = time.perf_counter() - started
-                                        on_clause(rem)
-                                        streamed_any = True
-                                    say_finished = True
-                if chunk.get("done"):
-                    eval_count = chunk.get("eval_count", 0)
-                    eval_duration_ns = chunk.get("eval_duration", 0)
-                    break
+        if llm_backend == "koboldcpp":
+            model_name = "koboldcpp"
+            eval_count, tps = _stream_koboldcpp(kobold_url, messages, max_tokens, timeout_s, _on_token)
+        else:
+            payload = {
+                "model": model_name,
+                "messages": messages,
+                "format": "json",
+                "stream": True,
+                "keep_alive": -1,
+                "options": {
+                    "num_gpu": 0,
+                    "num_thread": 8,
+                    "num_ctx": 2048,
+                    "num_predict": max_tokens,
+                    "temperature": 0.55,
+                    "top_p": 0.88,
+                },
+            }
+            req = urllib.request.Request(
+                f"{OLLAMA_URL}/api/chat",
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                    for raw_line in resp:
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        if not line:
+                            continue
+                        chunk = json.loads(line)
+                        token_str = chunk.get("message", {}).get("content", "")
+                        if token_str:
+                            _on_token(token_str)
+                        if chunk.get("done"):
+                            eval_count = chunk.get("eval_count", 0)
+                            eval_duration_ns = chunk.get("eval_duration", 0)
+                            break
+                tps = (eval_count / (eval_duration_ns / 1e9)) if eval_duration_ns > 0 else 0.0
+            except urllib.error.URLError:
+                if llm_backend == "auto":
+                    model_name = "koboldcpp"
+                    eval_count, tps = _stream_koboldcpp(kobold_url, messages, max_tokens, timeout_s, _on_token)
+                else:
+                    raise
     except Exception as e:
         return Result(
             dict(FALLBACK_ACTION),
@@ -183,13 +263,11 @@ def decide(
         )
 
     latency = time.perf_counter() - started
-    tps = (eval_count / (eval_duration_ns / 1e9)) if eval_duration_ns > 0 else 0.0
     content = "".join(content_parts)
 
     try:
         decision = json.loads(content)
     except json.JSONDecodeError as e:
-        # Si el modelo alcanzó max_tokens antes de cerrar el JSON, recuperamos el texto "say" ya emitido sin perder la respuesta
         m = _SAY_PARTIAL_RE.search(content)
         if m and m.group(1).strip():
             recovered = _trim_say(_clean_partial_say(m.group(1), allow_okey), max_say)

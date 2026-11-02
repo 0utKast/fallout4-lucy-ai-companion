@@ -85,8 +85,31 @@ def _transcript(turns: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _recap_koboldcpp(kobold_url: str, messages: list[dict]) -> dict:
+    payload = {
+        "messages": messages,
+        "max_tokens": 450,
+        "temperature": 0.6,
+        "response_format": {"type": "json_object"},
+        "stream": False,
+    }
+    req = urllib.request.Request(
+        f"{kobold_url}/v1/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=45.0) as resp:
+        raw = json.loads(resp.read().decode("utf-8"))
+    content = raw["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
 def recap(state: dict, turns: list[dict], model: str | None = None) -> dict:
-    model_name = model or personas.current()["ollama_model"]
+    cfg = personas.current()
+    model_name = model or cfg["ollama_model"]
+    llm_backend = cfg.get("llm_backend", "auto")
+    kobold_url = cfg.get("koboldcpp_url", "http://127.0.0.1:5001")
     system = RECAP_RULES.read_text(encoding="utf-8").rstrip() + "\n\n# Persona\n\n" + persona_text()
     known = {k: state.get(k) for k in ("trust", "respect", "journal", "last_session", "sessions")}
     body = (
@@ -95,29 +118,37 @@ def recap(state: dict, turns: list[dict], model: str | None = None) -> dict:
         + "\n\nTHE SESSION JUST ENDED\n"
         + _transcript(turns)
     )
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": body},
+    ]
 
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": body},
-        ],
-        "format": RECAP_SCHEMA,
-        "stream": False,
-        "keep_alive": -1,
-        "options": {"temperature": 0.6, "repeat_penalty": 1.18, "num_ctx": 8192, "num_predict": 450},
-    }
-
-    req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/chat",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=45.0) as resp:
-        raw = json.loads(resp.read().decode("utf-8"))
-
-    r = json.loads(raw["message"]["content"])
+    if llm_backend == "koboldcpp":
+        r = _recap_koboldcpp(kobold_url, messages)
+    else:
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "format": RECAP_SCHEMA,
+            "stream": False,
+            "keep_alive": -1,
+            "options": {"temperature": 0.6, "repeat_penalty": 1.18, "num_ctx": 8192, "num_predict": 450},
+        }
+        req = urllib.request.Request(
+            f"{OLLAMA_URL}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45.0) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+            r = json.loads(raw["message"]["content"])
+        except Exception:
+            if llm_backend == "auto":
+                r = _recap_koboldcpp(kobold_url, messages)
+            else:
+                raise
     said = [t["decision"]["say"] for t in turns if t["decision"].get("say")]
     ended = datetime.fromisoformat(turns[-1]["at"]).astimezone()
 

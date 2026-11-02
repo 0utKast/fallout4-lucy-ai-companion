@@ -1,37 +1,44 @@
-"""Synchronous Clause-Streaming Local Voice Engine powered by Kokoro-ONNX (82M).
+"""Motor de voz local por cláusulas en tiempo real compatible con Kokoro-ONNX (82M) y KoboldCpp (audio.cpp TTS).
 
-Runs 100% on CPU (0 MB VRAM overhead for Fallout 4 & Ollama) at ~5x real-time speed.
-Splits each companion line into natural clauses so the first clause ("Okey-dokey!",
-"Oh, sugar!", etc.) finishes synthesizing in ~180 ms and begins playing immediately
-while subsequent clauses synthesize in parallel in the background.
+Se ejecuta 100% en local sin consumo de VRAM para Fallout 4 y Fallout 4 VR.
+Divide cada frase en cláusulas naturales para que la primera cláusula empiece a sonar en ~180 ms
+mientras las siguientes se sintetizan en paralelo en segundo plano.
 """
 
+from array import array
+import json
 import os
 import queue
 import re
 import struct
 import threading
 import time
+import urllib.error
+import urllib.request
 import winsound
 from pathlib import Path
 
-# Ensure eSpeak NG path is configured on Windows before importing kokoro_onnx
+# Asegura que eSpeak NG esté configurado en Windows antes de importar kokoro_onnx
 if "PHONEMIZER_ESPEAK_PATH" not in os.environ and Path(r"C:\Program Files\eSpeak NG").exists():
     os.environ["PHONEMIZER_ESPEAK_PATH"] = r"C:\Program Files\eSpeak NG"
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 import personas
 
 HERE = Path(__file__).parent
 LOCAL_MODELS_DIR = HERE / "models" / "kokoro"
 FALLBACK_MODELS_DIR = Path(r"C:\proyectos_python\MisApps\Texto_a_voz")
 
-# Split on sentence boundaries (. ! ?) or after a comma/semicolon when the first clause is short
+# Divide en límites de oración (. ! ?) o tras coma/punto y coma cuando la primera cláusula es corta
 CLAUSE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|(?<=[,;—])\s+")
 
 
 def split_into_clauses(text: str) -> list[str]:
-    """Splits a line into clauses so the first chunk is short (~2-7 words) for instant TTFA (<220 ms)."""
+    """Divide una frase en cláusulas para que el primer fragmento sea corto (~2-7 palabras) y suene al instante (<220 ms)."""
     raw = [c.strip() for c in CLAUSE_SPLIT_RE.split(text.strip()) if c.strip()]
     if not raw:
         return []
@@ -50,13 +57,37 @@ def split_into_clauses(text: str) -> list[str]:
     return clauses
 
 
-def _float_to_wav(samples: np.ndarray, sample_rate: int, gain: float = 1.0) -> bytes:
-    arr = np.clip(samples * gain, -1.0, 1.0)
-    pcm16 = (arr * 32767.0).astype(np.int16).tobytes()
+def _float_to_wav(samples, sample_rate: int, gain: float = 1.0) -> bytes:
+    if np is not None:
+        arr = np.clip(samples * gain, -1.0, 1.0)
+        pcm16 = (arr * 32767.0).astype(np.int16).tobytes()
+    else:
+        pcm = array("h", (max(-32768, min(32767, int(s * gain * 32767.0))) for s in samples))
+        pcm16 = pcm.tobytes()
     header = b"RIFF" + struct.pack("<I", 36 + len(pcm16)) + b"WAVE"
     header += b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16)
     header += b"data" + struct.pack("<I", len(pcm16))
     return header + pcm16
+
+
+def _scale_wav_bytes(wav_bytes: bytes, gain: float) -> bytes:
+    """Escala el volumen de un WAV PCM de 16 bits usando únicamente la librería estándar de Python."""
+    if abs(gain - 1.0) < 0.03 or not wav_bytes.startswith(b"RIFF"):
+        return wav_bytes
+    idx = wav_bytes.find(b"data")
+    if idx < 0 or idx + 8 > len(wav_bytes):
+        return wav_bytes
+    data_offset = idx + 8
+    header = wav_bytes[:data_offset]
+    raw_pcm = wav_bytes[data_offset:]
+    if len(raw_pcm) % 2 != 0:
+        raw_pcm = raw_pcm[:-1]
+    samples = array("h")
+    samples.frombytes(raw_pcm)
+    for i in range(len(samples)):
+        val = int(samples[i] * gain)
+        samples[i] = 32767 if val > 32767 else (-32768 if val < -32768 else val)
+    return header + samples.tobytes()
 
 
 class LocalVoice:
@@ -65,18 +96,18 @@ class LocalVoice:
         self.enabled = cfg["voice_enabled"] if enabled is None else enabled
         self.voice_name = voice_name or cfg["kokoro_voice"]
         self.volume = cfg["voice_volume"]
-        self.lang = cfg.get("language", "en-us")
+        self.lang = cfg.get("language", "es")
+        self.tts_backend = cfg.get("tts_backend", "auto")
+        self.koboldcpp_url = cfg.get("koboldcpp_url", "http://127.0.0.1:5001")
         self.kokoro = None
         self.voice_style = None
+        self.use_kobold_tts = False
 
-        # Two-stage pipeline for synchronous streaming:
-        # 1. _synth_queue receives (clauses, distance_m) and synthesizes clause-by-clause
-        # 2. _play_queue receives ready WAV bytes and plays them back-to-back with zero gap
         self._synth_queue: queue.Queue = queue.Queue(maxsize=16)
         self._play_queue: queue.Queue = queue.Queue(maxsize=16)
 
         if self.enabled:
-            self._init_kokoro()
+            self._init_voice_engine()
 
     def _find_model_files(self) -> tuple[Path | None, Path | None]:
         for base in (LOCAL_MODELS_DIR, FALLBACK_MODELS_DIR):
@@ -85,47 +116,87 @@ class LocalVoice:
             if m.exists() and v.exists():
                 return m, v
         LOCAL_MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        print(
-            f"[LocalVoice-ES] Coloca kokoro-v1.0.onnx y voices-v1.0.bin dentro de {LOCAL_MODELS_DIR} para activar la síntesis de voz.",
-            flush=True,
-        )
         return None, None
 
-    def _init_kokoro(self) -> None:
+    def _synth_koboldcpp_wav(self, text: str, gain: float = 1.0) -> bytes | None:
+        """Sintetiza una cláusula en WAV mediante los endpoints TTS audio.cpp unificados de KoboldCpp."""
+        voice_id = "ef_dora" if self.voice_name == "lucy_blend" else self.voice_name
+        for endpoint, payload in (
+            (
+                f"{self.koboldcpp_url}/api/extra/tts",
+                {"input": text, "voice": voice_id},
+            ),
+            (
+                f"{self.koboldcpp_url}/v1/audio/speech",
+                {"input": text, "voice": voice_id, "response_format": "wav"},
+            ),
+        ):
+            try:
+                req = urllib.request.Request(
+                    endpoint,
+                    data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    wav_bytes = resp.read()
+                    if wav_bytes and wav_bytes.startswith(b"RIFF"):
+                        return _scale_wav_bytes(wav_bytes, gain)
+            except Exception:
+                continue
+        return None
+
+    def _init_voice_engine(self) -> None:
+        if self.tts_backend == "koboldcpp":
+            self.use_kobold_tts = True
+            threading.Thread(target=self._synth_worker, daemon=True).start()
+            threading.Thread(target=self._play_worker, daemon=True).start()
+            print(
+                f"[LocalVoice-ES] Streaming TTS por HTTP con KoboldCpp (audio.cpp) activo en {self.koboldcpp_url} (voz='{self.voice_name}').",
+                flush=True,
+            )
+            return
+
+        # Primero intenta Kokoro-ONNX local
         try:
             from kokoro_onnx import Kokoro
 
             model_path, voices_path = self._find_model_files()
-            if not model_path or not voices_path:
-                print("[LocalVoice] Kokoro model files not found; running in HUD-subtitle-only mode.", flush=True)
-                self.enabled = False
+            if model_path and voices_path:
+                self.kokoro = Kokoro(str(model_path), str(voices_path))
+                self.voice_style = self.resolve_voice(self.voice_name)
+                self.kokoro.create("Okey-dokey.", voice=self.voice_style, speed=1.05, lang=self.lang)
+
+                threading.Thread(target=self._synth_worker, daemon=True).start()
+                threading.Thread(target=self._play_worker, daemon=True).start()
+                threading.Thread(target=self._prewarm_barks_worker, daemon=True).start()
+                print(
+                    f"[LocalVoice-ES] Kokoro-ONNX listo para streaming síncrono (voz='{self.voice_name}', idioma='{self.lang}').",
+                    flush=True,
+                )
                 return
+        except Exception:
+            pass
 
-            self.kokoro = Kokoro(str(model_path), str(voices_path))
-            self.voice_style = self.resolve_voice(self.voice_name)
-            # Warmup synthesis so the ONNX session is hot
-            self.kokoro.create("Okey-dokey.", voice=self.voice_style, speed=1.05, lang=self.lang)
-
+        # Fallback automático a KoboldCpp audio.cpp TTS cuando tts_backend == "auto"
+        if self.tts_backend == "auto":
+            self.use_kobold_tts = True
             threading.Thread(target=self._synth_worker, daemon=True).start()
             threading.Thread(target=self._play_worker, daemon=True).start()
-            threading.Thread(target=self._prewarm_barks_worker, daemon=True).start()
             print(
-                f"[LocalVoice] Kokoro-ONNX synchronous streaming ready (voice='{self.voice_name}', lang='{self.lang}').",
+                f"[LocalVoice-ES] Archivos de Kokoro-ONNX no encontrados; activado automáticamente KoboldCpp (audio.cpp) TTS en {self.koboldcpp_url} "
+                f"(o coloca kokoro-v1.0.onnx y voices-v1.0.bin en {LOCAL_MODELS_DIR}).",
                 flush=True,
             )
-        except Exception as e:
-            print(f"[LocalVoice] Failed to initialize Kokoro-ONNX ({e}); using HUD subtitles only.", flush=True)
+        else:
+            print("[LocalVoice-ES] Archivos de modelo Kokoro no encontrados; usando modo solo subtítulos HUD.", flush=True)
             self.enabled = False
 
     def resolve_voice(self, name: str):
-        """Returns either a custom blended style vector ('lucy_blend') or a standard Kokoro voice style."""
+        """Devuelve un vector mezclado personalizado ('lucy_blend') o un estilo de voz estándar de Kokoro."""
         if not self.kokoro:
             return name
-        if name == "lucy_blend":
-            # Custom Ella Purnell / Lucy MacLean blend:
-            # 60% af_heart (warm, expressive Grade-A American)
-            # + 25% af_bella (bright, enthusiastic Vault-girl energy)
-            # + 15% bf_emma (subtle crisp articulation)
+        if name == "lucy_blend" and np is not None:
             return (
                 0.60 * self.kokoro.get_voice_style("af_heart")
                 + 0.25 * self.kokoro.get_voice_style("af_bella")
@@ -135,9 +206,17 @@ class LocalVoice:
             return self.kokoro.get_voice_style(name)
         return self.kokoro.get_voice_style("af_heart")
 
+    def _synthesize_single_clause(self, clause: str, gain: float) -> bytes | None:
+        if self.kokoro is not None:
+            samples, sr = self.kokoro.create(clause, voice=self.voice_style, speed=1.04, lang=self.lang)
+            return _float_to_wav(samples, sr, gain=gain)
+        if self.use_kobold_tts:
+            return self._synth_koboldcpp_wav(clause, gain=gain)
+        return None
+
     def play_bark_fast(self, text: str, distance_m: float = 2.0) -> float:
         """Reproduce una frase icónica pre-cacheada en disco con latencia 0.00s (o la sintetiza al vuelo si aún no está en caché)."""
-        if not self.enabled or not self.kokoro or not text or distance_m > 40.0:
+        if not self.enabled or (not self.kokoro and not self.use_kobold_tts) or not text or distance_m > 40.0:
             return 0.0
         try:
             from barks import bark_cache_path
@@ -157,6 +236,8 @@ class LocalVoice:
 
     def _prewarm_barks_worker(self) -> None:
         """Pre-genera y guarda en disco todos los WAVs de las frases icónicas de Lucy para reproducción en 0.00s."""
+        if not self.kokoro:
+            return
         try:
             from barks import BARKS_ES, bark_cache_path
 
@@ -175,8 +256,8 @@ class LocalVoice:
             print(f"[LocalVoice-ES] Aviso en prewarm de barks: {e}", flush=True)
 
     def speak_clause(self, clause: str, distance_m: float = 2.0) -> None:
-        """Immediately queues a single clause for synthesis and playback (used by token streaming)."""
-        if not self.enabled or not self.kokoro or not clause or distance_m > 40.0:
+        """Encola inmediatamente una cláusula individual para síntesis y reproducción (usado por el streaming de tokens)."""
+        if not self.enabled or (not self.kokoro and not self.use_kobold_tts) or not clause or distance_m > 40.0:
             return
         clause = clause.strip()
         if not clause:
@@ -187,8 +268,8 @@ class LocalVoice:
             pass
 
     def speak(self, text: str, distance_m: float = 2.0, block: bool = False) -> float:
-        """Streams `text` clause-by-clause. Returns time-to-first-audio (ms) if `block=True`."""
-        if not self.enabled or not self.kokoro or not text or distance_m > 40.0:
+        """Transmite `text` cláusula por cláusula. Devuelve el tiempo hasta el primer audio (ms) si `block=True`."""
+        if not self.enabled or (not self.kokoro and not self.use_kobold_tts) or not text or distance_m > 40.0:
             return 0.0
         clauses = split_into_clauses(text)
         if not clauses:
@@ -201,7 +282,6 @@ class LocalVoice:
                 pass
             return 0.0
 
-        # Synchronous blocking mode with TTFA measurement (great for testing/demos)
         dist_factor = 1.0 if distance_m <= 8.0 else max(0.25, 1.0 - 0.75 * (distance_m - 8.0) / 32.0)
         gain = self.volume * dist_factor
         local_q: queue.Queue = queue.Queue()
@@ -211,11 +291,11 @@ class LocalVoice:
         def producer():
             nonlocal ttfa_ms
             for idx, clause in enumerate(clauses):
-                samples, sr = self.kokoro.create(clause, voice=self.voice_style, speed=1.04, lang=self.lang)
-                wav_bytes = _float_to_wav(samples, sr, gain=gain)
-                if idx == 0:
-                    ttfa_ms = (time.perf_counter() - t0) * 1000.0
-                local_q.put(wav_bytes)
+                wav_bytes = self._synthesize_single_clause(clause, gain=gain)
+                if wav_bytes:
+                    if idx == 0:
+                        ttfa_ms = (time.perf_counter() - t0) * 1000.0
+                    local_q.put(wav_bytes)
             local_q.put(None)
 
         threading.Thread(target=producer, daemon=True).start()
@@ -233,11 +313,11 @@ class LocalVoice:
             gain = self.volume * dist_factor
             for clause in clauses:
                 try:
-                    samples, sr = self.kokoro.create(clause, voice=self.voice_style, speed=1.04, lang=self.lang)
-                    wav_bytes = _float_to_wav(samples, sr, gain=gain)
-                    self._play_queue.put(wav_bytes)
+                    wav_bytes = self._synthesize_single_clause(clause, gain=gain)
+                    if wav_bytes:
+                        self._play_queue.put(wav_bytes)
                 except Exception as e:
-                    print(f"[LocalVoice] Clause synth error: {e}", flush=True)
+                    print(f"[LocalVoice-ES] Error de síntesis en cláusula: {e}", flush=True)
 
     def _play_worker(self) -> None:
         while True:
@@ -245,4 +325,4 @@ class LocalVoice:
             try:
                 winsound.PlaySound(wav_bytes, winsound.SND_MEMORY | winsound.SND_NODEFAULT)
             except Exception as e:
-                print(f"[LocalVoice] Audio playback error: {e}", flush=True)
+                print(f"[LocalVoice-ES] Error de reproducción de audio: {e}", flush=True)

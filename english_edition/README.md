@@ -93,22 +93,19 @@ One of the core goals of this project is proving that **next-generation interact
 ## 5. Tools & Prerequisites
 To run the mod and the local AI bridge on Windows 10/11, you only need free, open-source local tools:
 
-1. **Fallout 4 (PC — Steam or GOG):**
-   - Compatible out of the box with both **`1.10.163` (Pre-Next-Gen / GOG)** and **`1.10.980+` (Next-Gen / Anniversary Edition)**.
-   - Requires **only** `Fallout4.esm` (zero DLC, zero Creation Club, and zero F4SE dependencies).
-2. **[Ollama](https://ollama.com/) (Local LLM Runner):**
-   - Download and install Ollama for Windows, then open a terminal and pull the lightweight `qwen2.5:3b` model (~1.9 GB):
-     ```powershell
-     ollama pull qwen2.5:3b
-     ```
-3. **[eSpeak NG](https://github.com/espeak-ng/espeak-ng/releases) (Phonemizer for Kokoro-ONNX):**
-   - Download and run the Windows `.msi` installer (`espeak-ng-X64.msi`), which installs to `C:\Program Files\eSpeak NG`.
-4. **Python 3.10+:**
-   - Install the lightweight Python dependencies from the repository root:
-     ```powershell
-     pip install -r requirements.txt
-     ```
-   - *(Note: On first launch, `voice_local.py` automatically downloads the official `kokoro-v1.0.onnx` and `voices-v1.0.bin` files into `bridge/models/kokoro/` if they are not already present).*
+1. **Fallout 4 or Fallout 4 VR (PC — Steam or GOG):**
+   - Compatible out of the box with **`1.10.163` (Pre-Next-Gen / GOG)**, **`1.10.980+` (Next-Gen / Anniversary Edition)**, and **Fallout 4 VR** (`setup_fo4_ini.py` and `server.py` automatically detect both `My Games\Fallout4` and `My Games\Fallout4VR`).
+   - Requires **only** `Fallout4.esm` (zero DLC, zero Creation Club, and zero F4SE / DLL dependencies).
+2. **Local AI & Voice Backend — Choose EITHER Option A (Ollama + Kokoro-ONNX) OR Option B (KoboldCpp All-in-One):**
+   - **Option A — [Ollama](https://ollama.com/) (`127.0.0.1:11434`) + [Kokoro-ONNX](https://github.com/thewh1teagle/kokoro-onnx):**
+     - Download and install Ollama for Windows, then pull `qwen2.5:3b` (~1.9 GB):
+       ```powershell
+       ollama pull qwen2.5:3b
+       ```
+     - Install **[eSpeak NG](https://github.com/espeak-ng/espeak-ng/releases)** (`espeak-ng-X64.msi`) and Python dependencies (`pip install -r requirements.txt`).
+   - **Option B — [KoboldCpp](https://github.com/LostRuins/koboldcpp) (`127.0.0.1:5001` Unified LLM + `audio.cpp` TTS):**
+     - Load any GGUF language model and enable `audio.cpp` TTS inside `koboldcpp.exe` on default port `5001`.
+     - The Bridge (`companion.ini` with `llm_backend = auto` and `tts_backend = auto`, or set explicitly to `koboldcpp`) automatically connects to KoboldCpp's `/v1/chat/completions` and `/api/extra/tts` (`/v1/audio/speech`) endpoints with zero `pip` packages required!
 
 ---
 

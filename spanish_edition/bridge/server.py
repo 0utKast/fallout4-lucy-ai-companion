@@ -30,16 +30,15 @@ HERE = Path(__file__).parent
 STATE_FILE = HERE / "state" / f"{personas.current()['id']}.json"
 LOG_DIR = HERE / "logs"
 
-FO4_USER_LOG = (
-    Path.home()
-    / "Documents"
-    / "My Games"
-    / "Fallout4"
-    / "Logs"
-    / "Script"
-    / "User"
-    / "LucyCompanionBridge.0.log"
-)
+FO4_USER_LOGS = [
+    root / game_dir / "Logs" / "Script" / "User" / "LucyCompanionBridge.0.log"
+    for root in (
+        Path.home() / "Documents" / "My Games",
+        Path.home() / "OneDrive" / "Documents" / "My Games",
+    )
+    for game_dir in ("Fallout4", "Fallout4VR")
+]
+FO4_USER_LOG = FO4_USER_LOGS[0]
 
 DEFAULT_STATE = {
     "trust": 55,
@@ -453,44 +452,53 @@ def _snap_priority(snap: dict) -> int:
 
 def watch_papyrus_log(hud: SubtitleHUD, voice: LocalVoice) -> None:
     marker = "[LUCY_SNAPSHOT]"
-    last_size = FO4_USER_LOG.stat().st_size if FO4_USER_LOG.exists() else 0
-    print(f"[Watcher-ES] Escuchando log Papyrus de Fallout 4 en: {FO4_USER_LOG}", flush=True)
+    last_sizes: dict[Path, int] = {
+        log_path: (log_path.stat().st_size if log_path.exists() else 0)
+        for log_path in FO4_USER_LOGS
+    }
+    print(
+        "[Watcher-ES] Escuchando logs Papyrus de Fallout 4 y Fallout 4 VR:\n  - "
+        + "\n  - ".join(str(p) for p in FO4_USER_LOGS[:2]),
+        flush=True,
+    )
 
     while True:
         time.sleep(0.05)
-        if not FO4_USER_LOG.exists():
-            continue
-        size = FO4_USER_LOG.stat().st_size
-        if size < last_size:
-            last_size = 0
-        if size == last_size:
-            continue
-        try:
-            with FO4_USER_LOG.open("r", encoding="utf-8", errors="replace") as f:
-                f.seek(last_size)
-                new_text = f.read()
-                last_size = f.tell()
-            snap_lines = [line for line in new_text.splitlines() if marker in line]
-            if snap_lines:
-                parsed = [s for s in (_parse_snap_line(l, marker) for l in snap_lines) if s is not None]
-                if not parsed:
-                    continue
-                best_snap = parsed[-1]
-                best_prio = _snap_priority(best_snap)
-                for s in reversed(parsed):
-                    p = _snap_priority(s)
-                    if p > best_prio:
-                        best_snap = s
-                        best_prio = p
-                res = process_snapshot(best_snap, hud=hud, voice=voice)
-                if res.decision.get("say"):
-                    print(
-                        f"\n[TTFA {res.ttfa_s:.2f}s | Total {res.latency_s:.2f}s | {res.tokens_per_s} tok/s | {res.decision['mood']}] "
-                        f"Lucy: \"{res.decision['say']}\"",
-                        flush=True,
-                    )
-        except Exception as e:
-            print(f"[Watcher-ES] Error leyendo log: {e}", flush=True)
+        for log_path in FO4_USER_LOGS:
+            if not log_path.exists():
+                continue
+            size = log_path.stat().st_size
+            last_size = last_sizes.get(log_path, 0)
+            if size < last_size:
+                last_size = 0
+            if size == last_size:
+                continue
+            try:
+                with log_path.open("r", encoding="utf-8", errors="replace") as f:
+                    f.seek(last_size)
+                    new_text = f.read()
+                    last_sizes[log_path] = f.tell()
+                snap_lines = [line for line in new_text.splitlines() if marker in line]
+                if snap_lines:
+                    parsed = [s for s in (_parse_snap_line(l, marker) for l in snap_lines) if s is not None]
+                    if not parsed:
+                        continue
+                    best_snap = parsed[-1]
+                    best_prio = _snap_priority(best_snap)
+                    for s in reversed(parsed):
+                        p = _snap_priority(s)
+                        if p > best_prio:
+                            best_snap = s
+                            best_prio = p
+                    res = process_snapshot(best_snap, hud=hud, voice=voice)
+                    if res.decision.get("say"):
+                        print(
+                            f"\n[TTFA {res.ttfa_s:.2f}s | Total {res.latency_s:.2f}s | {res.tokens_per_s} tok/s | {res.decision['mood']}] "
+                            f"Lucy: \"{res.decision['say']}\"",
+                            flush=True,
+                        )
+            except Exception as e:
+                print(f"[Watcher-ES] Error leyendo log ({log_path.name}): {e}", flush=True)
 
 
 def run_server() -> None:
