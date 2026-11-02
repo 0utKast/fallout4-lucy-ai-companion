@@ -132,8 +132,8 @@ python english_edition/build_lucy_mod.py --install
 ```
 
 ### Step 3: Start the Local AI Bridge Server
-Double-click **[`english_edition/Start_Lucy_Bridge_EN.cmd`](english_edition/Start_Lucy_Bridge_EN.cmd)** (or run `python english_edition/bridge/server.py`).
-- A transparent subtitle overlay and a small green **`[F8] Chat with Lucy`** indicator will appear in the top-left corner of your screen.
+Run **`python start_lucy_bridge.py`** (or `python bridge/server.py`) and **`python open_lucy_chat.py`** inside the `Lucy_AI_Bridge_EN` folder.
+- The live Pip-Boy chat window and subtitle overlay will appear on your screen.
 
 ### Step 4: Meet, Recruit & Chat with Lucy in Fallout 4!
 1. **Meet Lucy Outside Vault 111:** Walk out of Vault 111 (or fast-travel to Vault 111 on an existing save). Lucy is waiting right next to the **Vault 111 exterior elevator control console** (`~12.5m` off the elevator platform). *(You can also use **`[Lucy] 4. Call / Summon Lucy Here`** in your Pip-Boy `Aid` tab to bring her directly to you).*
@@ -197,8 +197,8 @@ python spanish_edition/build_lucy_mod.py --install
 ```
 
 ### Paso 3: Iniciar el Servidor Puente de IA Local
-Haz doble clic en **[`spanish_edition/Iniciar_Lucy_Bridge_ES.cmd`](spanish_edition/Iniciar_Lucy_Bridge_ES.cmd)** (o ejecuta `python spanish_edition/bridge/server.py`).
-- Verás aparecer el indicador verde **`[F8] Chatear con Lucy`** en la esquina superior izquierda de la pantalla.
+Ejecuta **`python iniciar_lucy_bridge.py`** (o `python bridge/server.py`) y **`python abrir_chat_lucy.py`** dentro de la carpeta `Lucy_AI_Bridge_ES`.
+- Verás aparecer la ventana interactiva de comunicaciones Pip-Boy y los subtítulos HUD en pantalla.
 
 ### Paso 4: ¡Juega, Recluta a Lucy y Chatea en Tiempo Real!
 1. **Encuentro en el Refugio 111:** Al salir del ascensor del Refugio 111 (o viajando rápido al Refugio 111 en tu partida actual), encontrarás a Lucy esperando junto a la consola de control exterior del Refugio 111. *(También puedes usar el objeto **`[Lucy] 4. Llamar / Acercar a Lucy aquí`** en la pestaña `Ayuda` de tu Pip-Boy).*

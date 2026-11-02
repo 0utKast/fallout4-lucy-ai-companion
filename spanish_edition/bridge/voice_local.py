@@ -84,24 +84,11 @@ class LocalVoice:
             v = base / "voices-v1.0.bin"
             if m.exists() and v.exists():
                 return m, v
-        # Descarga automática de los archivos oficiales Kokoro-ONNX v1.0 en la primera ejecución si no existen localmente
-        try:
-            import urllib.request
-
-            LOCAL_MODELS_DIR.mkdir(parents=True, exist_ok=True)
-            base_url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
-            m = LOCAL_MODELS_DIR / "kokoro-v1.0.onnx"
-            v = LOCAL_MODELS_DIR / "voices-v1.0.bin"
-            if not m.exists():
-                print("[LocalVoice-ES] Descargando kokoro-v1.0.onnx (configuración inicial)...", flush=True)
-                urllib.request.urlretrieve(f"{base_url}/kokoro-v1.0.onnx", str(m))
-            if not v.exists():
-                print("[LocalVoice-ES] Descargando voices-v1.0.bin (configuración inicial)...", flush=True)
-                urllib.request.urlretrieve(f"{base_url}/voices-v1.0.bin", str(v))
-            if m.exists() and v.exists():
-                return m, v
-        except Exception as e:
-            print(f"[LocalVoice-ES] Aviso de descarga automática: {e}", flush=True)
+        LOCAL_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        print(
+            f"[LocalVoice-ES] Coloca kokoro-v1.0.onnx y voices-v1.0.bin dentro de {LOCAL_MODELS_DIR} para activar la síntesis de voz.",
+            flush=True,
+        )
         return None, None
 
     def _init_kokoro(self) -> None:

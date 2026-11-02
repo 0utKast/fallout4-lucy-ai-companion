@@ -1,13 +1,12 @@
 """Ventana Interactiva de Comunicaciones Pip-Boy Vault-Tec con Lucy MacLean (Edición 100% en Español — Formato Grande 4K).
 
-- Tamaño amplio (~70% ancho x ~52% alto de pantalla) para poder leerse cómodamente a distancia en pantallas 4K,
-  ya que puede minimizarse u ocultarse al instante con F8 o ESC.
+- Implementación pura con biblioteca estándar de Python y Tkinter.
+- Tamaño amplio (~70% ancho x ~52% alto de pantalla) para poder leerse cómodamente a distancia en pantallas 4K.
 - Tipografía grande de 18pt por defecto con botones [A-] / [A+] en la cabecera para ajustar el tamaño en vivo.
 - La caja de escritura está anclada con `side="bottom"` primero y margen vertical generoso (`ipady=8`) para que nunca se corte.
 - Soporta todos los caracteres del castellano (`á, é, í, ó, ú, ñ, ü, ¿, ¡`) y voz en español (`ef_dora`) en tiempo real.
 """
 
-import ctypes
 import json
 import queue
 import threading
@@ -18,41 +17,12 @@ import urllib.request
 
 BRIDGE_STREAM_URL = "http://127.0.0.1:7777/chat_stream"
 
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
-
-
-def _force_foreground(hwnd: int) -> None:
-    """Trae la ventana al frente de forma fiable sobre Fallout 4 en modo ventana sin bordes."""
-    if not hwnd:
-        return
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        fg_hwnd = user32.GetForegroundWindow()
-        fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-        cur_tid = kernel32.GetCurrentThreadId()
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, True)
-        user32.keybd_event(0x12, 0, 2, 0)
-        user32.BringWindowToTop(hwnd)
-        user32.ShowWindow(hwnd, 5)  # SW_SHOW
-        user32.SetForegroundWindow(hwnd)
-        user32.SetFocus(hwnd)
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, False)
-    except Exception:
-        pass
-
 
 def main() -> None:
-    user32 = ctypes.windll.user32
     ui_queue: queue.Queue = queue.Queue()
 
     root = tk.Tk()
-    root.title("Comunicaciones Pip-Boy Vault-Tec — Lucy MacLean (F8: Mostrar/Ocultar)")
+    root.title("Comunicaciones Pip-Boy Vault-Tec — Lucy MacLean (F8 / ESC: Minimizar)")
     root.attributes("-topmost", True)
     root.attributes("-alpha", 0.96)
     root.configure(bg="#08110B")
@@ -89,7 +59,7 @@ def main() -> None:
 
     help_lbl = tk.Label(
         header,
-        text="[ENTER: Enviar  |  ESC o F8: Ocultar/Mostrar]",
+        text="[ENTER: Enviar  |  ESC o F8: Minimizar]",
         font=("Consolas", 12, "bold"),
         fg="#A5D6A7",
         bg="#08110B",
@@ -127,7 +97,7 @@ def main() -> None:
     entry.pack(side="left", fill="x", expand=True, ipady=8)
 
     status_var = tk.StringVar(
-        value="● Listo — Escribe tu mensaje para Lucy en español y pulsa ENTER (Pulsa F8 o ESC en cualquier momento para ocultar)."
+        value="● Listo — Escribe tu mensaje para Lucy en español y pulsa ENTER (Pulsa F8 o ESC para minimizar)."
     )
     status_lbl = tk.Label(
         inner,
@@ -180,7 +150,41 @@ def main() -> None:
 
     _apply_font_size(font_size)
 
-    # Botones de tamaño de letra [A-] / [A+] en la cabecera
+    chat_visible = True
+
+    def _show_chat() -> None:
+        nonlocal chat_visible
+        chat_visible = True
+        root.deiconify()
+        root.lift()
+        root.attributes("-topmost", True)
+        root.focus_force()
+        entry.focus_force()
+
+    def _hide_chat() -> None:
+        nonlocal chat_visible
+        chat_visible = False
+        root.iconify()
+
+    def _toggle_chat(event=None):
+        if chat_visible and root.state() != "iconic":
+            _hide_chat()
+        else:
+            _show_chat()
+        return "break"
+
+    btn_hide = tk.Button(
+        header,
+        text=" Minimizar ",
+        font=("Consolas", 11, "bold"),
+        fg="#26FF7E",
+        bg="#13261A",
+        activebackground="#1B3B26",
+        relief="flat",
+        command=_hide_chat,
+    )
+    btn_hide.pack(side="right", padx=4)
+
     btn_plus = tk.Button(
         header,
         text=" A+ ",
@@ -239,36 +243,8 @@ def main() -> None:
     _append_msg(
         "sys",
         "",
-        "--- Enlace directo Pip-Boy establecido con Lucy MacLean (Refugio 33). ¡Pregúntale lo que quieras en español! (Usa [A+] / [A-] arriba a la derecha para cambiar el tamaño de letra, o pulsa F8 / ESC para ocultar/mostrar) ---",
+        "--- Enlace directo Pip-Boy establecido con Lucy MacLean (Refugio 33). ¡Pregúntale lo que quieras en español! (Usa [A+] / [A-] arriba a la derecha para cambiar el tamaño de letra, o F8 / ESC para minimizar) ---",
     )
-
-    root.update_idletasks()
-    chat_hwnd = user32.GetParent(root.winfo_id()) or root.winfo_id()
-    saved_game_hwnd = 0
-    chat_visible = True
-
-    def _show_chat() -> None:
-        nonlocal saved_game_hwnd, chat_visible
-        fg = user32.GetForegroundWindow()
-        if fg and fg != chat_hwnd:
-            saved_game_hwnd = fg
-        chat_visible = True
-        root.deiconify()
-        root.lift()
-        root.attributes("-topmost", True)
-        root.update_idletasks()
-        hwnd = user32.GetParent(root.winfo_id()) or root.winfo_id()
-        _force_foreground(hwnd)
-        entry.focus_force()
-
-    def _hide_chat() -> None:
-        nonlocal chat_visible
-        if not chat_visible:
-            return
-        chat_visible = False
-        root.withdraw()
-        if saved_game_hwnd:
-            _force_foreground(saved_game_hwnd)
 
     def _send_to_bridge(msg: str) -> None:
         t0 = time.perf_counter()
@@ -303,14 +279,14 @@ def main() -> None:
                     (
                         "status",
                         "",
-                        f"● Lucy ha respondido ({dt:.1f}s) — Escribe otro mensaje y pulsa ENTER (o ESC/F8 para volver a Fallout 4).",
+                        f"● Lucy ha respondido ({dt:.1f}s) — Escribe otro mensaje y pulsa ENTER (o ESC/F8 para minimizar).",
                     )
                 )
             else:
                 ui_queue.put(("status", "", "● Listo — Escribe tu mensaje y pulsa ENTER."))
         except Exception as e:
             ui_queue.put(("sys", "", f"[Error conectando con el servidor en 127.0.0.1:7777: {e}]"))
-            ui_queue.put(("status", "", "● Comprueba que el servidor puente esté en ejecución."))
+            ui_queue.put(("status", "", "● Comprueba que el servidor Bridge esté en marcha."))
 
     def _on_submit(event=None):
         msg = entry.get().strip()
@@ -323,13 +299,15 @@ def main() -> None:
         return "break"
 
     entry.bind("<Return>", _on_submit)
-    entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])
-    root.bind("<Escape>", lambda e: _hide_chat())
+    entry.bind("<Escape>", _toggle_chat)
+    entry.bind("<F8>", _toggle_chat)
+    root.bind("<Escape>", _toggle_chat)
+    root.bind("<F8>", _toggle_chat)
 
     def _console_input_loop() -> None:
         print("============================================================================", flush=True)
-        print("  CHAT EN VIVO CON LUCY MACLEAN (REFUGIO 33 — EDICIÓN ESPAÑOL) LISTO", flush=True)
-        print("  - La ventana flotante 'Comunicaciones Pip-Boy Vault-Tec' (F8) está abierta.", flush=True)
+        print("  CHAT EN VIVO CON LUCY MACLEAN (REFUGIO 33) LISTO", flush=True)
+        print("  - La ventana flotante 'Comunicaciones Pip-Boy Vault-Tec' está abierta.", flush=True)
         print("  - También puedes escribir aquí en la consola y pulsar ENTER.", flush=True)
         print("============================================================================\n", flush=True)
         while True:
@@ -345,29 +323,17 @@ def main() -> None:
 
     threading.Thread(target=_console_input_loop, daemon=True).start()
 
-    f8_was_down = False
-
     def _poll():
-        nonlocal f8_was_down
-        f8_down = bool(user32.GetAsyncKeyState(0x77) & 0x8000)
-        if f8_down and not f8_was_down:
-            if chat_visible:
-                _hide_chat()
-            else:
-                _show_chat()
-        f8_was_down = f8_down
-
         try:
             while True:
                 role, speaker, text = ui_queue.get_nowait()
                 _append_msg(role, speaker, text)
         except queue.Empty:
             pass
-
-        root.after(35, _poll)
+        root.after(45, _poll)
 
     root.after(100, entry.focus_force)
-    root.after(35, _poll)
+    root.after(45, _poll)
     root.mainloop()
 
 

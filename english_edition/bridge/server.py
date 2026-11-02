@@ -494,10 +494,10 @@ def watch_papyrus_log(hud: SubtitleHUD, voice: LocalVoice) -> None:
             print(f"[Watcher] Log parse error: {e}", flush=True)
 
 
-if __name__ == "__main__":
+def run_server() -> None:
     cfg = personas.current()
     print(
-        f"=== Local AI Bridge: {cfg['full_name']} | Ollama Model: {cfg['ollama_model']} (CPU P-Core Streaming + F8 Live Chat) ===",
+        f"=== Local AI Bridge: {cfg['full_name']} | Ollama Model: {cfg['ollama_model']} (CPU P-Core Streaming + Live Chat) ===",
         flush=True,
     )
     forms_db = build_or_load_forms_db()
@@ -525,5 +525,9 @@ if __name__ == "__main__":
 
     threading.Thread(target=watch_papyrus_log, args=(hud, voice), daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), BridgeHandler)
-    print(f"Server ready on http://{HOST}:{PORT}/decide & /chat_stream (Press F8 anytime in Fallout 4 to open Live Chat!)", flush=True)
+    print(f"Server ready on http://{HOST}:{PORT}/decide & /chat_stream", flush=True)
     server.serve_forever()
+
+
+if __name__ == "__main__":
+    run_server()

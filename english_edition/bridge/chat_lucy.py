@@ -1,13 +1,12 @@
 """Interactive Vault-Tec Pip-Boy Live Chat Window for Lucy MacLean (Fallout 4 — Large 4K Couch-Readable Edition).
 
-- Sized generously (~70% screen width x ~50% screen height) so it is effortless to read from a distance on 4K displays,
-  since it can be hidden/shown instantly anytime with F8 or ESC.
+- Pure standard Python & Tkinter implementation.
+- Sized generously (~70% screen width x ~52% screen height) so it is effortless to read from a distance on 4K displays.
 - Large 18pt default typography with live [A-] / [A+] buttons in the header to adjust text size on the fly.
-- Input bar is packed at `side="bottom"` first with generous vertical padding (`ipady=10`) so large text is never clipped.
+- Input bar is packed at `side="bottom"` first with generous vertical padding (`ipady=8`) so large text is never clipped.
 - Connects to `http://127.0.0.1:7777/chat_stream` for real-time synchronized voice + text streaming.
 """
 
-import ctypes
 import json
 import queue
 import threading
@@ -18,48 +17,18 @@ import urllib.request
 
 BRIDGE_STREAM_URL = "http://127.0.0.1:7777/chat_stream"
 
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
-
-
-def _force_foreground(hwnd: int) -> None:
-    """Reliably brings `hwnd` to the foreground on Windows 10/11 over Borderless Fallout 4."""
-    if not hwnd:
-        return
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        fg_hwnd = user32.GetForegroundWindow()
-        fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-        cur_tid = kernel32.GetCurrentThreadId()
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, True)
-        user32.keybd_event(0x12, 0, 2, 0)
-        user32.BringWindowToTop(hwnd)
-        user32.ShowWindow(hwnd, 5)  # SW_SHOW
-        user32.SetForegroundWindow(hwnd)
-        user32.SetFocus(hwnd)
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, False)
-    except Exception:
-        pass
-
 
 def main() -> None:
-    user32 = ctypes.windll.user32
     ui_queue: queue.Queue = queue.Queue()
 
     root = tk.Tk()
-    root.title("Vault-Tec Pip-Boy Comms — Lucy MacLean (F8: Show/Hide)")
+    root.title("Vault-Tec Pip-Boy Comms — Lucy MacLean (F8 / ESC: Minimize)")
     root.attributes("-topmost", True)
     root.attributes("-alpha", 0.96)
     root.configure(bg="#08110B")
 
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
-    # Large, distance-readable window (~70% width x ~52% height, centered)
     c_w = int(screen_w * 0.70)
     c_h = int(screen_h * 0.52)
     c_x = (screen_w - c_w) // 2
@@ -90,7 +59,7 @@ def main() -> None:
 
     help_lbl = tk.Label(
         header,
-        text="[ENTER: Send  |  ESC or F8: Hide/Show]",
+        text="[ENTER: Send  |  ESC or F8: Minimize]",
         font=("Consolas", 12, "bold"),
         fg="#A5D6A7",
         bg="#08110B",
@@ -128,7 +97,7 @@ def main() -> None:
     entry.pack(side="left", fill="x", expand=True, ipady=8)
 
     status_var = tk.StringVar(
-        value="● Ready — Type your message to Lucy in English and press ENTER (Press F8 or ESC anytime to hide)."
+        value="● Ready — Type your message to Lucy in English and press ENTER (Press F8 or ESC anytime to minimize)."
     )
     status_lbl = tk.Label(
         inner,
@@ -181,7 +150,41 @@ def main() -> None:
 
     _apply_font_size(font_size)
 
-    # Font size adjustment buttons [A-] / [A+] in the header bar
+    chat_visible = True
+
+    def _show_chat() -> None:
+        nonlocal chat_visible
+        chat_visible = True
+        root.deiconify()
+        root.lift()
+        root.attributes("-topmost", True)
+        root.focus_force()
+        entry.focus_force()
+
+    def _hide_chat() -> None:
+        nonlocal chat_visible
+        chat_visible = False
+        root.iconify()
+
+    def _toggle_chat(event=None):
+        if chat_visible and root.state() != "iconic":
+            _hide_chat()
+        else:
+            _show_chat()
+        return "break"
+
+    btn_hide = tk.Button(
+        header,
+        text=" Minimize ",
+        font=("Consolas", 11, "bold"),
+        fg="#26FF7E",
+        bg="#13261A",
+        activebackground="#1B3B26",
+        relief="flat",
+        command=_hide_chat,
+    )
+    btn_hide.pack(side="right", padx=4)
+
     btn_plus = tk.Button(
         header,
         text=" A+ ",
@@ -240,36 +243,8 @@ def main() -> None:
     _append_msg(
         "sys",
         "",
-        "--- Pip-Boy Direct Comms established with Lucy MacLean (Vault 33). Ask her anything in English! (Use [A+] / [A-] at the top right to adjust text size, or press F8 / ESC to hide/show) ---",
+        "--- Pip-Boy Direct Comms established with Lucy MacLean (Vault 33). Ask her anything in English! (Use [A+] / [A-] at the top right to adjust text size, or press F8 / ESC to minimize) ---",
     )
-
-    root.update_idletasks()
-    chat_hwnd = user32.GetParent(root.winfo_id()) or root.winfo_id()
-    saved_game_hwnd = 0
-    chat_visible = True
-
-    def _show_chat() -> None:
-        nonlocal saved_game_hwnd, chat_visible
-        fg = user32.GetForegroundWindow()
-        if fg and fg != chat_hwnd:
-            saved_game_hwnd = fg
-        chat_visible = True
-        root.deiconify()
-        root.lift()
-        root.attributes("-topmost", True)
-        root.update_idletasks()
-        hwnd = user32.GetParent(root.winfo_id()) or root.winfo_id()
-        _force_foreground(hwnd)
-        entry.focus_force()
-
-    def _hide_chat() -> None:
-        nonlocal chat_visible
-        if not chat_visible:
-            return
-        chat_visible = False
-        root.withdraw()
-        if saved_game_hwnd:
-            _force_foreground(saved_game_hwnd)
 
     def _send_to_bridge(msg: str) -> None:
         t0 = time.perf_counter()
@@ -304,7 +279,7 @@ def main() -> None:
                     (
                         "status",
                         "",
-                        f"● Lucy replied ({dt:.1f}s) — Type another message and press ENTER (or ESC/F8 to return to Fallout 4).",
+                        f"● Lucy replied ({dt:.1f}s) — Type another message and press ENTER (or ESC/F8 to minimize).",
                     )
                 )
             else:
@@ -324,13 +299,15 @@ def main() -> None:
         return "break"
 
     entry.bind("<Return>", _on_submit)
-    entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])
-    root.bind("<Escape>", lambda e: _hide_chat())
+    entry.bind("<Escape>", _toggle_chat)
+    entry.bind("<F8>", _toggle_chat)
+    root.bind("<Escape>", _toggle_chat)
+    root.bind("<F8>", _toggle_chat)
 
     def _console_input_loop() -> None:
         print("============================================================================", flush=True)
         print("  LIVE CHAT WITH LUCY MACLEAN (VAULT 33) READY", flush=True)
-        print("  - The floating 'Vault-Tec Pip-Boy Comms' window (F8) is open on screen.", flush=True)
+        print("  - The floating 'Vault-Tec Pip-Boy Comms' window is open on screen.", flush=True)
         print("  - You can also type here in the console and press ENTER.", flush=True)
         print("============================================================================\n", flush=True)
         while True:
@@ -346,29 +323,17 @@ def main() -> None:
 
     threading.Thread(target=_console_input_loop, daemon=True).start()
 
-    f8_was_down = False
-
     def _poll():
-        nonlocal f8_was_down
-        f8_down = bool(user32.GetAsyncKeyState(0x77) & 0x8000)
-        if f8_down and not f8_was_down:
-            if chat_visible:
-                _hide_chat()
-            else:
-                _show_chat()
-        f8_was_down = f8_down
-
         try:
             while True:
                 role, speaker, text = ui_queue.get_nowait()
                 _append_msg(role, speaker, text)
         except queue.Empty:
             pass
-
-        root.after(35, _poll)
+        root.after(45, _poll)
 
     root.after(100, entry.focus_force)
-    root.after(35, _poll)
+    root.after(45, _poll)
     root.mainloop()
 
 

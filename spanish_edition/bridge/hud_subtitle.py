@@ -1,37 +1,12 @@
-"""Superposición de Subtítulos HUD para Fallout 4 + Chat en Vivo Pip-Boy (F8) en Español."""
+"""Superposición de Subtítulos HUD para Fallout 4 + Chat en Vivo Pip-Boy en Español.
 
-import ctypes
+- Implementación pura con biblioteca estándar de Python y Tkinter.
+"""
+
 import queue
 import threading
 import time
 from typing import Callable
-
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
-
-
-def _force_foreground(hwnd: int) -> None:
-    if not hwnd:
-        return
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        fg_hwnd = user32.GetForegroundWindow()
-        fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-        cur_tid = kernel32.GetCurrentThreadId()
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, True)
-        user32.keybd_event(0x12, 0, 2, 0)
-        user32.BringWindowToTop(hwnd)
-        user32.ShowWindow(hwnd, 5)
-        user32.SetForegroundWindow(hwnd)
-        user32.SetFocus(hwnd)
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, False)
-    except Exception:
-        pass
 
 
 class SubtitleHUD:
@@ -72,8 +47,6 @@ class SubtitleHUD:
         try:
             import tkinter as tk
 
-            user32 = ctypes.windll.user32
-
             root = tk.Tk()
             root.withdraw()
             root.overrideredirect(True)
@@ -105,27 +78,16 @@ class SubtitleHUD:
 
             hint_lbl = tk.Label(
                 frame,
-                text="[Pulsa F8 en cualquier momento para abrir el Chat en Vivo con Lucy]",
+                text="[Haz clic aquí o abre el Chat en Vivo con Lucy en cualquier momento]",
                 font=("Consolas", 12),
                 fg="#26FF7E",
                 bg="#0C120E",
+                cursor="hand2",
             )
             hint_lbl.pack(pady=(6, 0))
 
-            root.update_idletasks()
-            sub_hwnd = user32.GetParent(root.winfo_id())
-            if sub_hwnd:
-                GWL_EXSTYLE = -20
-                WS_EX_LAYERED = 0x00080000
-                WS_EX_TRANSPARENT = 0x00000020
-                WS_EX_TOOLWINDOW = 0x00000080
-                style = user32.GetWindowLongW(sub_hwnd, GWL_EXSTYLE)
-                user32.SetWindowLongW(
-                    sub_hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW
-                )
-
             chat_win = tk.Toplevel(root)
-            chat_win.title("Comunicaciones Pip-Boy Vault-Tec — Lucy MacLean (F8: Mostrar/Ocultar)")
+            chat_win.title("Comunicaciones Pip-Boy Vault-Tec — Lucy MacLean (ESC / F8: Ocultar)")
             chat_win.withdraw()
             chat_win.attributes("-topmost", True)
             chat_win.attributes("-alpha", 0.96)
@@ -157,7 +119,7 @@ class SubtitleHUD:
 
             help_lbl = tk.Label(
                 header,
-                text="[ENTER: Enviar  |  ESC o F8: Cerrar y volver a Fallout 4]",
+                text="[ENTER: Enviar  |  ESC o F8: Ocultar]",
                 font=("Consolas", 12, "bold"),
                 fg="#A5D6A7",
                 bg="#08110B",
@@ -194,7 +156,7 @@ class SubtitleHUD:
             entry.pack(side="left", fill="x", expand=True, ipady=8)
 
             status_var = tk.StringVar(
-                value="● Listo — Escribe cualquier pregunta o comentario para Lucy en español y pulsa ENTER."
+                value="● Listo — Escribe cualquier pregunta o comentario en español y pulsa ENTER."
             )
             status_lbl = tk.Label(
                 inner,
@@ -228,9 +190,6 @@ class SubtitleHUD:
             history.tag_config("lucy_msg", foreground="#E8F5E9", font=("Segoe UI", font_size))
             history.tag_config("sys_msg", foreground="#81C784", font=("Consolas", 14, "italic"))
 
-            chat_win.update_idletasks()
-            chat_hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
-            saved_game_hwnd = 0
             streaming_line_active = False
 
             def _append_history(role: str, speaker: str, text: str) -> None:
@@ -258,31 +217,20 @@ class SubtitleHUD:
             _append_history(
                 "sys",
                 "",
-                "--- Enlace Directo Pip-Boy establecido con Lucy MacLean (Refugio 33). ¡Pregúntale lo que quieras en español! ---",
+                "--- Enlace directo Pip-Boy establecido con Lucy MacLean (Refugio 33). ¡Pregúntale lo que quieras en español! ---",
             )
 
-            def _show_chat() -> None:
-                nonlocal saved_game_hwnd
-                if self.chat_open:
-                    return
-                fg = user32.GetForegroundWindow()
-                if fg and fg != chat_hwnd and fg != sub_hwnd:
-                    saved_game_hwnd = fg
+            def _show_chat(event=None) -> None:
                 self.chat_open = True
                 chat_win.deiconify()
                 chat_win.lift()
-                chat_win.update_idletasks()
-                hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
-                _force_foreground(hwnd)
+                chat_win.attributes("-topmost", True)
+                chat_win.focus_force()
                 entry.focus_force()
 
-            def _hide_chat() -> None:
-                if not self.chat_open:
-                    return
+            def _hide_chat(event=None) -> None:
                 self.chat_open = False
                 chat_win.withdraw()
-                if saved_game_hwnd:
-                    _force_foreground(saved_game_hwnd)
 
             def _on_submit(event=None):
                 msg = entry.get().strip()
@@ -295,23 +243,19 @@ class SubtitleHUD:
                     threading.Thread(target=self.on_player_chat, args=(msg,), daemon=True).start()
                 return "break"
 
+            hint_lbl.bind("<Button-1>", _show_chat)
+            label.bind("<Button-1>", _show_chat)
             entry.bind("<Return>", _on_submit)
             entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])
-            chat_win.bind("<Escape>", lambda e: _hide_chat())
+            entry.bind("<F8>", lambda e: (_hide_chat(), "break")[1])
+            chat_win.bind("<Escape>", _hide_chat)
+            chat_win.bind("<F8>", _hide_chat)
+            chat_win.protocol("WM_DELETE_WINDOW", _hide_chat)
 
             hide_at = 0.0
-            f8_was_down = False
 
             def poll():
-                nonlocal hide_at, f8_was_down
-                f8_down = bool(user32.GetAsyncKeyState(0x77) & 0x8000)
-                if f8_down and not f8_was_down:
-                    if self.chat_open:
-                        _hide_chat()
-                    else:
-                        _show_chat()
-                f8_was_down = f8_down
-
+                nonlocal hide_at
                 try:
                     while True:
                         speaker, text, dur = self._sub_queue.get_nowait()
@@ -344,4 +288,4 @@ class SubtitleHUD:
             root.after(45, poll)
             root.mainloop()
         except Exception as e:
-            print(f"[HUD-ES] Nota de superposición gráfica ({e}); usando consola.", flush=True)
+            print(f"[HUD] Error en superposición gráfica ({e}); usando consola.", flush=True)

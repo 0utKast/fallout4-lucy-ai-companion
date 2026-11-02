@@ -493,7 +493,7 @@ def watch_papyrus_log(hud: SubtitleHUD, voice: LocalVoice) -> None:
             print(f"[Watcher-ES] Error leyendo log: {e}", flush=True)
 
 
-if __name__ == "__main__":
+def run_server() -> None:
     cfg = personas.current()
     print(
         f"=== Puente IA Local (ESPAÑOL): {cfg['full_name']} | Modelo Ollama: {cfg['ollama_model']} | Voz: {cfg['kokoro_voice']} ({cfg['language']}) ===",
@@ -523,5 +523,9 @@ if __name__ == "__main__":
 
     threading.Thread(target=watch_papyrus_log, args=(hud, voice), daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), BridgeHandler)
-    print(f"Servidor Español activo en http://{HOST}:{PORT}/decide & /chat_stream (¡Pulsa F8 en cualquier momento para chatear con Lucy!)", flush=True)
+    print(f"Servidor Español activo en http://{HOST}:{PORT}/decide & /chat_stream", flush=True)
     server.serve_forever()
+
+
+if __name__ == "__main__":
+    run_server()

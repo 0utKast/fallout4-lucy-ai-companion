@@ -1,17 +1,10 @@
 """Resolución de FormIDs de Fallout 4 para Snapshots Papyrus (Edición 100% Español)."""
 
 import json
-import re
-import struct
-import zlib
 from pathlib import Path
 
 HERE = Path(__file__).parent
 CACHE_FILE = HERE / "fo4_forms.json"
-
-FO4_DATA_DIR = Path(r"C:\Program Files (x86)\Steam\steamapps\common\Fallout 4\Data")
-FO4_ESM = FO4_DATA_DIR / "Fallout4.esm"
-FO4_INTERFACE_BA2 = FO4_DATA_DIR / "Fallout4 - Interface.ba2"
 
 ANIMAL_KEYWORDS = (
     "dog",
@@ -59,46 +52,6 @@ _LAST_LOCATION: str = ""
 _LAST_RAD_STORM: bool = False
 
 
-def _camel_to_words(edid: str) -> str:
-    s = re.sub(r"^(LCTN|WTHR|WEAP|NPC|RACE|enc|lvl| DLC\d+)[_]*", "", edid, flags=re.IGNORECASE)
-    s = re.sub(r"Location$", "", s)
-    s = re.sub(r"([a-z])([A-Z])", r"\1 \2", s)
-    s = s.replace("_", " ").strip()
-    return s or edid
-
-
-def _load_en_strings() -> dict[int, str]:
-    if not FO4_INTERFACE_BA2.exists():
-        return {}
-    sraw = b""
-    with FO4_INTERFACE_BA2.open("rb") as f:
-        _m, _v, _t, nf, ntbl = struct.unpack("<4sI4sIQ", f.read(24))
-        f.seek(ntbl)
-        names = [
-            f.read(struct.unpack("<H", f.read(2))[0]).decode("utf-8", "replace")
-            for _ in range(nf)
-        ]
-        f.seek(24)
-        for nm in names:
-            _nh, _ext, _dh, _unk, ofs, pk, unpk, _al = struct.unpack("<I4sIIQIII", f.read(36))
-            if nm.lower() in ("strings\\fallout4_es.strings", "strings\\fallout4_en.strings"):
-                f.seek(ofs)
-                sraw = zlib.decompress(f.read(pk)) if pk > 0 else f.read(unpk)
-                break
-    if not sraw:
-        return {}
-    cnt, _dsz = struct.unpack_from("<II", sraw, 0)
-    strings: dict[int, str] = {}
-    base_data = 8 + cnt * 8
-    for i in range(cnt):
-        sid, off = struct.unpack_from("<II", sraw, 8 + i * 8)
-        start = base_data + off
-        end = sraw.find(b"\x00", start)
-        if end != -1:
-            strings[sid] = sraw[start:end].decode("utf-8", "replace")
-    return strings
-
-
 def build_or_load_forms_db() -> dict:
     global _FORMS_DB
     if _FORMS_DB is not None:
@@ -106,15 +59,12 @@ def build_or_load_forms_db() -> dict:
     if CACHE_FILE.exists():
         _FORMS_DB = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         return _FORMS_DB
-
-    db: dict[str, str] = {
+    _FORMS_DB = {
         "0": "Desarmado",
         "20": "Único Superviviente",
         str(0x01000813): "Mono del Refugio 33",
         str(0x01000820): "Lucy MacLean",
     }
-    CACHE_FILE.write_text(json.dumps(db, ensure_ascii=False), encoding="utf-8")
-    _FORMS_DB = db
     return _FORMS_DB
 
 

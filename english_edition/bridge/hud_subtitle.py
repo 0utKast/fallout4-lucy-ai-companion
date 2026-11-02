@@ -1,45 +1,15 @@
-"""Fallout 4 HUD Subtitle Overlay + Interactive Vault-Tec Pip-Boy Live Chat (F8).
+"""Fallout 4 HUD Subtitle Overlay + Interactive Vault-Tec Pip-Boy Live Chat.
 
-1. Click-through Subtitle HUD:
-   Displays Lucy's spoken lines at the bottom of the screen without stealing focus.
-2. Interactive Live Chat Window (Toggled anytime with F8):
-   Opens a large, distance-readable Vault-Tec / Pip-Boy comms panel on top of Fallout 4 (Borderless Windowed),
-   with 18pt typography and input box packed at `side="bottom"` first so text is never clipped.
+- Pure standard Python & Tkinter implementation.
+- Displays Lucy's spoken lines at the bottom of the screen.
+- Includes an interactive Vault-Tec / Pip-Boy comms panel on top of Fallout 4 (Borderless Windowed),
+  with 18pt typography and input box packed at `side="bottom"` first so text is never clipped.
 """
 
-import ctypes
 import queue
 import threading
 import time
 from typing import Callable
-
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
-
-
-def _force_foreground(hwnd: int) -> None:
-    """Reliably brings `hwnd` to the foreground on Windows 10/11 using AttachThreadInput."""
-    if not hwnd:
-        return
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        fg_hwnd = user32.GetForegroundWindow()
-        fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-        cur_tid = kernel32.GetCurrentThreadId()
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, True)
-        user32.keybd_event(0x12, 0, 2, 0)
-        user32.BringWindowToTop(hwnd)
-        user32.ShowWindow(hwnd, 5)  # SW_SHOW
-        user32.SetForegroundWindow(hwnd)
-        user32.SetFocus(hwnd)
-        if fg_tid and fg_tid != cur_tid:
-            user32.AttachThreadInput(fg_tid, cur_tid, False)
-    except Exception:
-        pass
 
 
 class SubtitleHUD:
@@ -59,7 +29,7 @@ class SubtitleHUD:
             threading.Thread(target=self._run_tk, daemon=True).start()
 
     def show(self, speaker: str, text: str, duration_s: float | None = None) -> None:
-        """Shows a subtitle on the click-through overlay AND updates the live chat log if open."""
+        """Shows a subtitle on the overlay AND updates the live chat log if open."""
         if not text or not self.enabled:
             return
         if duration_s is None:
@@ -83,9 +53,7 @@ class SubtitleHUD:
         try:
             import tkinter as tk
 
-            user32 = ctypes.windll.user32
-
-            # 1. Click-through Subtitle Window
+            # 1. Subtitle Window
             root = tk.Tk()
             root.withdraw()
             root.overrideredirect(True)
@@ -117,28 +85,17 @@ class SubtitleHUD:
 
             hint_lbl = tk.Label(
                 frame,
-                text="[Press F8 anytime to open Live Chat with Lucy]",
+                text="[Click here or open Live Chat with Lucy anytime]",
                 font=("Consolas", 12),
                 fg="#26FF7E",
                 bg="#0C120E",
+                cursor="hand2",
             )
             hint_lbl.pack(pady=(6, 0))
 
-            root.update_idletasks()
-            sub_hwnd = user32.GetParent(root.winfo_id())
-            if sub_hwnd:
-                GWL_EXSTYLE = -20
-                WS_EX_LAYERED = 0x00080000
-                WS_EX_TRANSPARENT = 0x00000020
-                WS_EX_TOOLWINDOW = 0x00000080
-                style = user32.GetWindowLongW(sub_hwnd, GWL_EXSTYLE)
-                user32.SetWindowLongW(
-                    sub_hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW
-                )
-
-            # 2. Interactive Pip-Boy Live Chat Window (Toggled by F8)
+            # 2. Interactive Pip-Boy Live Chat Window
             chat_win = tk.Toplevel(root)
-            chat_win.title("Vault-Tec Pip-Boy Comms — Lucy MacLean (F8: Show/Hide)")
+            chat_win.title("Vault-Tec Pip-Boy Comms — Lucy MacLean (ESC / F8: Hide)")
             chat_win.withdraw()
             chat_win.attributes("-topmost", True)
             chat_win.attributes("-alpha", 0.96)
@@ -170,7 +127,7 @@ class SubtitleHUD:
 
             help_lbl = tk.Label(
                 header,
-                text="[ENTER: Send  |  ESC or F8: Close & Return to Fallout 4]",
+                text="[ENTER: Send  |  ESC or F8: Hide]",
                 font=("Consolas", 12, "bold"),
                 fg="#A5D6A7",
                 bg="#08110B",
@@ -242,9 +199,6 @@ class SubtitleHUD:
             history.tag_config("lucy_msg", foreground="#E8F5E9", font=("Segoe UI", font_size))
             history.tag_config("sys_msg", foreground="#81C784", font=("Consolas", 14, "italic"))
 
-            chat_win.update_idletasks()
-            chat_hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
-            saved_game_hwnd = 0
             streaming_line_active = False
 
             def _append_history(role: str, speaker: str, text: str) -> None:
@@ -275,28 +229,17 @@ class SubtitleHUD:
                 "--- Vault-Tec Pip-Boy Direct Link established with Lucy MacLean (Vault 33). Ask her anything in English! ---",
             )
 
-            def _show_chat() -> None:
-                nonlocal saved_game_hwnd
-                if self.chat_open:
-                    return
-                fg = user32.GetForegroundWindow()
-                if fg and fg != chat_hwnd and fg != sub_hwnd:
-                    saved_game_hwnd = fg
+            def _show_chat(event=None) -> None:
                 self.chat_open = True
                 chat_win.deiconify()
                 chat_win.lift()
-                chat_win.update_idletasks()
-                hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
-                _force_foreground(hwnd)
+                chat_win.attributes("-topmost", True)
+                chat_win.focus_force()
                 entry.focus_force()
 
-            def _hide_chat() -> None:
-                if not self.chat_open:
-                    return
+            def _hide_chat(event=None) -> None:
                 self.chat_open = False
                 chat_win.withdraw()
-                if saved_game_hwnd:
-                    _force_foreground(saved_game_hwnd)
 
             def _on_submit(event=None):
                 msg = entry.get().strip()
@@ -309,23 +252,19 @@ class SubtitleHUD:
                     threading.Thread(target=self.on_player_chat, args=(msg,), daemon=True).start()
                 return "break"
 
+            hint_lbl.bind("<Button-1>", _show_chat)
+            label.bind("<Button-1>", _show_chat)
             entry.bind("<Return>", _on_submit)
             entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])
-            chat_win.bind("<Escape>", lambda e: _hide_chat())
+            entry.bind("<F8>", lambda e: (_hide_chat(), "break")[1])
+            chat_win.bind("<Escape>", _hide_chat)
+            chat_win.bind("<F8>", _hide_chat)
+            chat_win.protocol("WM_DELETE_WINDOW", _hide_chat)
 
             hide_at = 0.0
-            f8_was_down = False
 
             def poll():
-                nonlocal hide_at, f8_was_down
-                f8_down = bool(user32.GetAsyncKeyState(0x77) & 0x8000)
-                if f8_down and not f8_was_down:
-                    if self.chat_open:
-                        _hide_chat()
-                    else:
-                        _show_chat()
-                f8_was_down = f8_down
-
+                nonlocal hide_at
                 try:
                     while True:
                         speaker, text, dur = self._sub_queue.get_nowait()
