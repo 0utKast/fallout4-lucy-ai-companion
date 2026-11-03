@@ -1,9 +1,12 @@
-"""Fallout 4 HUD Subtitle Overlay + Interactive Vault-Tec Pip-Boy Live Chat.
+"""Seamless In-Game Pip-Boy Subtitle & Live Chat HUD Overlay for Fallout 4 [English Edition v1.1.0].
 
-- Pure standard Python & Tkinter implementation.
-- Displays Lucy's spoken lines at the bottom of the screen.
-- Includes an interactive Vault-Tec / Pip-Boy comms panel on top of Fallout 4 (Borderless Windowed),
-  with 18pt typography and input box packed at `side="bottom"` first so text is never clipped.
+- Pure Python standard library + Tkinter implementation (zero external binary/hook dependencies).
+- Renders directly over Borderless Windowed Fallout 4 (`bBorderless=1, bFull Screen=0`) with zero Windows titlebars (`overrideredirect(True)`).
+- Features:
+  1. Bottom In-Game Subtitle HUD bar when Lucy speaks.
+  2. Discreet bottom-right `[● PIP-BOY COMMS: LUCY]` HUD pill that can be clicked anytime (or triggered in-game via Lucy's `E` Companion Menu Option 1 or the `[Lucy] 0.` Favorites Wheel hotkey).
+  3. Frameless lower-screen Vault-Tec Pip-Boy Chat HUD Overlay (`overrideredirect(True)`) so Lucy and the Fallout 4 world remain visible while you type.
+  4. `Auto-Resume Game: ON` (default): pressing `ENTER` to send a message automatically hides the input HUD and returns keyboard/mouse control to Fallout 4 while Lucy speaks her answer out loud with in-game subtitles.
 """
 
 import queue
@@ -29,7 +32,6 @@ class SubtitleHUD:
             threading.Thread(target=self._run_tk, daemon=True).start()
 
     def show(self, speaker: str, text: str, duration_s: float | None = None) -> None:
-        """Shows a subtitle on the overlay AND updates the live chat log if open."""
         if not text or not self.enabled:
             return
         if duration_s is None:
@@ -39,13 +41,11 @@ class SubtitleHUD:
         self._chat_queue.put(("lucy_stream", speaker, text))
 
     def add_chat_message(self, role: str, speaker: str, text: str) -> None:
-        """Appends a finalized message ('player', 'lucy', or 'status') to the chat window."""
         if not self.enabled:
             return
         self._chat_queue.put((role, speaker, text))
 
     def open_chat(self) -> None:
-        """Requests opening the interactive chat overlay from any thread."""
         if self.enabled:
             self._chat_queue.put(("__open__", "", ""))
 
@@ -53,7 +53,6 @@ class SubtitleHUD:
         try:
             import tkinter as tk
 
-            # 1. Subtitle Window
             root = tk.Tk()
             root.withdraw()
             root.overrideredirect(True)
@@ -63,13 +62,22 @@ class SubtitleHUD:
 
             screen_w = root.winfo_screenwidth()
             screen_h = root.winfo_screenheight()
+
+            # 1. Bottom In-Game Subtitle HUD Bar
             box_w = int(screen_w * 0.72)
             box_h = 180
             pos_x = (screen_w - box_w) // 2
             pos_y = int(screen_h * 0.80)
             root.geometry(f"{box_w}x{box_h}+{pos_x}+{pos_y}")
 
-            frame = tk.Frame(root, bg="#0C120E", bd=2, relief="solid", padx=22, pady=12)
+            frame = tk.Frame(
+                root,
+                bg="#08110B",
+                highlightbackground="#26FF7E",
+                highlightthickness=2,
+                padx=22,
+                pady=12,
+            )
             frame.pack(expand=True)
 
             label = tk.Label(
@@ -77,7 +85,7 @@ class SubtitleHUD:
                 text="",
                 font=("Segoe UI Semibold", 18),
                 fg="#E8F5E9",
-                bg="#0C120E",
+                bg="#08110B",
                 wraplength=box_w - 80,
                 justify="center",
             )
@@ -85,65 +93,127 @@ class SubtitleHUD:
 
             hint_lbl = tk.Label(
                 frame,
-                text="[Click here or open Live Chat with Lucy anytime]",
-                font=("Consolas", 12),
+                text="[Click here, select Option 1 on Lucy's E-Menu, or use Favorites '[Lucy] 0.' to open In-Game Pip-Boy Chat]",
+                font=("Consolas", 11),
                 fg="#26FF7E",
-                bg="#0C120E",
+                bg="#08110B",
                 cursor="hand2",
             )
             hint_lbl.pack(pady=(6, 0))
 
-            # 2. Interactive Pip-Boy Live Chat Window
+            # 2. Discreet Bottom-Right In-Game Pip-Boy Comms HUD Pill
+            pill_win = tk.Toplevel(root)
+            pill_win.overrideredirect(True)
+            pill_win.attributes("-topmost", True)
+            pill_win.attributes("-alpha", 0.80)
+            pill_win.configure(bg="#26FF7E", padx=1, pady=1)
+            pill_w = 320
+            pill_h = 34
+            pill_x = max(20, screen_w - pill_w - 28)
+            pill_y = max(20, int(screen_h * 0.94))
+            pill_win.geometry(f"{pill_w}x{pill_h}+{pill_x}+{pill_y}")
+
+            pill_inner = tk.Frame(pill_win, bg="#08110B", padx=8, pady=4)
+            pill_inner.pack(fill="both", expand=True)
+
+            pill_lbl = tk.Label(
+                pill_inner,
+                text="● PIP-BOY COMMS: LUCY [CHAT HUD]",
+                font=("Consolas", 10, "bold"),
+                fg="#26FF7E",
+                bg="#08110B",
+                cursor="hand2",
+            )
+            pill_lbl.pack(side="left", fill="x", expand=True)
+
+            pill_dismissed = False
+
+            def _dismiss_pill() -> None:
+                nonlocal pill_dismissed
+                pill_dismissed = True
+                pill_win.withdraw()
+
+            pill_close = tk.Label(
+                pill_inner,
+                text=" × ",
+                font=("Consolas", 10, "bold"),
+                fg="#81C784",
+                bg="#08110B",
+                cursor="hand2",
+            )
+            pill_close.pack(side="right")
+            pill_close.bind("<Button-1>", lambda e: _dismiss_pill())
+
+            # 3. Frameless In-Game Pip-Boy Chat HUD Overlay (Docked at Lower Screen)
             chat_win = tk.Toplevel(root)
-            chat_win.title("Vault-Tec Pip-Boy Comms — Lucy MacLean (ESC / F8: Hide)")
             chat_win.withdraw()
+            chat_win.overrideredirect(True)
             chat_win.attributes("-topmost", True)
-            chat_win.attributes("-alpha", 0.96)
-            chat_win.configure(bg="#26FF7E", padx=3, pady=3)
+            chat_win.attributes("-alpha", 0.92)
+            chat_win.configure(bg="#26FF7E", padx=2, pady=2)
 
-            c_w = int(screen_w * 0.70)
-            c_h = int(screen_h * 0.52)
-            c_x = (screen_w - c_w) // 2
-            c_y = int(screen_h * 0.24)
-            chat_win.geometry(f"{c_w}x{c_h}+{c_x}+{c_y}")
-            chat_win.minsize(900, 460)
+            compact_mode = True
+            auto_hide_on_send = True
+            font_size = 16
 
-            font_size = 18
+            def _apply_hud_geometry() -> None:
+                if compact_mode:
+                    c_w = int(screen_w * 0.66)
+                    c_h = int(screen_h * 0.30)
+                    c_x = (screen_w - c_w) // 2
+                    c_y = int(screen_h * 0.63)
+                else:
+                    c_w = int(screen_w * 0.72)
+                    c_h = int(screen_h * 0.52)
+                    c_x = (screen_w - c_w) // 2
+                    c_y = int(screen_h * 0.24)
+                chat_win.geometry(f"{c_w}x{c_h}+{c_x}+{c_y}")
 
-            inner = tk.Frame(chat_win, bg="#08110B", padx=24, pady=18)
+            _apply_hud_geometry()
+
+            inner = tk.Frame(chat_win, bg="#08110B", padx=18, pady=12)
             inner.pack(fill="both", expand=True)
 
-            header = tk.Frame(inner, bg="#08110B")
-            header.pack(side="top", fill="x", pady=(0, 12))
+            # Draggable HUD Header Bar
+            header = tk.Frame(inner, bg="#0D1F14", padx=10, pady=6)
+            header.pack(side="top", fill="x", pady=(0, 8))
 
             title_lbl = tk.Label(
                 header,
-                text="VAULT-TEC PIP-BOY COMMS // LUCY MACLEAN (VAULT 33)",
-                font=("Consolas", 15, "bold"),
+                text="PIP-BOY IN-GAME COMMS HUD // LUCY MACLEAN (VAULT 33)",
+                font=("Consolas", 13, "bold"),
                 fg="#26FF7E",
-                bg="#08110B",
+                bg="#0D1F14",
+                cursor="fleur",
             )
             title_lbl.pack(side="left")
 
-            help_lbl = tk.Label(
-                header,
-                text="[ENTER: Send  |  ESC or F8: Hide]",
-                font=("Consolas", 12, "bold"),
-                fg="#A5D6A7",
-                bg="#08110B",
-            )
-            help_lbl.pack(side="right")
+            drag_state = {"x": 0, "y": 0}
 
-            # Pack input bar at side="bottom" FIRST so it is never pushed off or clipped
+            def _start_drag(event) -> None:
+                drag_state["x"] = event.x_root - chat_win.winfo_x()
+                drag_state["y"] = event.y_root - chat_win.winfo_y()
+
+            def _do_drag(event) -> None:
+                nx = event.x_root - drag_state["x"]
+                ny = event.y_root - drag_state["y"]
+                chat_win.geometry(f"+{nx}+{ny}")
+
+            header.bind("<ButtonPress-1>", _start_drag)
+            header.bind("<B1-Motion>", _do_drag)
+            title_lbl.bind("<ButtonPress-1>", _start_drag)
+            title_lbl.bind("<B1-Motion>", _do_drag)
+
+            # Bottom Input Bar packed BEFORE history so it is never clipped
             input_frame = tk.Frame(
                 inner,
                 bg="#13261A",
                 highlightbackground="#26FF7E",
                 highlightthickness=2,
-                padx=16,
-                pady=12,
+                padx=14,
+                pady=8,
             )
-            input_frame.pack(side="bottom", fill="x", pady=(8, 6))
+            input_frame.pack(side="bottom", fill="x", pady=(6, 4))
 
             prompt_lbl = tk.Label(
                 input_frame,
@@ -162,42 +232,174 @@ class SubtitleHUD:
                 insertbackground="#26FF7E",
                 relief="flat",
             )
-            entry.pack(side="left", fill="x", expand=True, ipady=8)
+            entry.pack(side="left", fill="x", expand=True, ipady=6)
 
             status_var = tk.StringVar(
-                value="● Ready — Type any question or comment for Lucy in English and press ENTER."
+                value="● In-Game HUD Active — Type your message and press ENTER (returns directly to Fallout 4 while Lucy replies)."
             )
             status_lbl = tk.Label(
                 inner,
                 textvariable=status_var,
-                font=("Consolas", 13),
+                font=("Consolas", 11),
                 fg="#69F0AE",
                 bg="#08110B",
                 anchor="w",
             )
-            status_lbl.pack(side="bottom", fill="x", pady=(6, 4))
+            status_lbl.pack(side="bottom", fill="x", pady=(2, 2))
+
+            # Scrollable Conversation Transcript
+            history_frame = tk.Frame(
+                inner,
+                bg="#0D1911",
+                highlightbackground="#1B3B26",
+                highlightthickness=1,
+            )
+            history_frame.pack(side="top", fill="both", expand=True, pady=(0, 4))
+
+            scrollbar = tk.Scrollbar(
+                history_frame,
+                bg="#0D1911",
+                troughcolor="#08110B",
+                relief="flat",
+                width=14,
+            )
+            scrollbar.pack(side="right", fill="y")
 
             history = tk.Text(
-                inner,
+                history_frame,
                 font=("Segoe UI", font_size),
                 bg="#0D1911",
                 fg="#E8F5E9",
                 insertbackground="#26FF7E",
                 relief="flat",
-                padx=18,
-                pady=14,
+                padx=14,
+                pady=10,
                 wrap="word",
-                height=6,
-                spacing1=4,
-                spacing3=6,
+                height=4,
+                spacing1=3,
+                spacing3=4,
+                yscrollcommand=scrollbar.set,
                 state="disabled",
             )
-            history.pack(side="top", fill="both", expand=True, pady=(0, 6))
-            history.tag_config("player_tag", foreground="#FFD54F", font=("Segoe UI Bold", font_size))
-            history.tag_config("player_msg", foreground="#FFF8E1", font=("Segoe UI", font_size))
-            history.tag_config("lucy_tag", foreground="#26FF7E", font=("Segoe UI Bold", font_size))
-            history.tag_config("lucy_msg", foreground="#E8F5E9", font=("Segoe UI", font_size))
-            history.tag_config("sys_msg", foreground="#81C784", font=("Consolas", 14, "italic"))
+            history.pack(side="left", fill="both", expand=True)
+            scrollbar.config(command=history.yview)
+
+            def _apply_font_size(new_size: int) -> None:
+                nonlocal font_size
+                font_size = max(12, min(30, new_size))
+                prompt_lbl.config(font=("Consolas", font_size, "bold"))
+                entry.config(font=("Segoe UI Semibold", font_size))
+                history.config(font=("Segoe UI", font_size))
+                history.tag_config("player_tag", foreground="#FFD54F", font=("Segoe UI Bold", font_size))
+                history.tag_config("player_msg", foreground="#FFF8E1", font=("Segoe UI", font_size))
+                history.tag_config("lucy_tag", foreground="#26FF7E", font=("Segoe UI Bold", font_size))
+                history.tag_config("lucy_msg", foreground="#E8F5E9", font=("Segoe UI", font_size))
+                history.tag_config("sys_msg", foreground="#81C784", font=("Consolas", max(11, font_size - 3), "italic"))
+                history.see("end")
+
+            _apply_font_size(font_size)
+
+            def _focus_entry(event=None) -> None:
+                try:
+                    chat_win.lift()
+                    chat_win.focus_force()
+                    entry.focus_set()
+                    entry.focus_force()
+                except Exception:
+                    pass
+
+            def _show_chat(event=None) -> None:
+                self.chat_open = True
+                root.withdraw()
+                chat_win.deiconify()
+                chat_win.lift()
+                chat_win.attributes("-topmost", True)
+                _focus_entry()
+                chat_win.after(60, _focus_entry)
+                chat_win.after(180, _focus_entry)
+
+            def _hide_chat(event=None) -> None:
+                self.chat_open = False
+                chat_win.withdraw()
+                if not pill_dismissed:
+                    pill_win.deiconify()
+                    pill_win.lift()
+
+            def _toggle_compact() -> None:
+                nonlocal compact_mode
+                compact_mode = not compact_mode
+                btn_size_mode.config(text=" Expand HUD " if compact_mode else " Compact HUD ")
+                _apply_hud_geometry()
+                _focus_entry()
+
+            def _toggle_auto_hide() -> None:
+                nonlocal auto_hide_on_send
+                auto_hide_on_send = not auto_hide_on_send
+                if auto_hide_on_send:
+                    btn_auto.config(text=" Auto-Resume Game: ON ", fg="#08110B", bg="#26FF7E")
+                else:
+                    btn_auto.config(text=" Auto-Resume Game: OFF ", fg="#26FF7E", bg="#13261A")
+                _focus_entry()
+
+            btn_hide = tk.Button(
+                header,
+                text=" Hide HUD (ESC) ",
+                font=("Consolas", 10, "bold"),
+                fg="#FFD54F",
+                bg="#13261A",
+                activebackground="#1B3B26",
+                relief="flat",
+                command=_hide_chat,
+            )
+            btn_hide.pack(side="right", padx=3)
+
+            btn_size_mode = tk.Button(
+                header,
+                text=" Expand HUD ",
+                font=("Consolas", 10, "bold"),
+                fg="#26FF7E",
+                bg="#13261A",
+                activebackground="#1B3B26",
+                relief="flat",
+                command=_toggle_compact,
+            )
+            btn_size_mode.pack(side="right", padx=3)
+
+            btn_auto = tk.Button(
+                header,
+                text=" Auto-Resume Game: ON ",
+                font=("Consolas", 10, "bold"),
+                fg="#08110B",
+                bg="#26FF7E",
+                activebackground="#69F0AE",
+                relief="flat",
+                command=_toggle_auto_hide,
+            )
+            btn_auto.pack(side="right", padx=3)
+
+            btn_plus = tk.Button(
+                header,
+                text=" A+ ",
+                font=("Consolas", 10, "bold"),
+                fg="#26FF7E",
+                bg="#13261A",
+                activebackground="#1B3B26",
+                relief="flat",
+                command=lambda: (_apply_font_size(font_size + 2), _focus_entry()),
+            )
+            btn_plus.pack(side="right", padx=2)
+
+            btn_minus = tk.Button(
+                header,
+                text=" A- ",
+                font=("Consolas", 10, "bold"),
+                fg="#26FF7E",
+                bg="#13261A",
+                activebackground="#1B3B26",
+                relief="flat",
+                command=lambda: (_apply_font_size(font_size - 2), _focus_entry()),
+            )
+            btn_minus.pack(side="right", padx=2)
 
             streaming_line_active = False
 
@@ -226,34 +428,33 @@ class SubtitleHUD:
             _append_history(
                 "sys",
                 "",
-                "--- Vault-Tec Pip-Boy Direct Link established with Lucy MacLean (Vault 33). Ask her anything in English! ---",
+                "--- Seamless In-Game Pip-Boy Comms HUD linked to Lucy MacLean (Vault 33). Type below and press ENTER! ---",
             )
-
-            def _show_chat(event=None) -> None:
-                self.chat_open = True
-                chat_win.deiconify()
-                chat_win.lift()
-                chat_win.attributes("-topmost", True)
-                chat_win.focus_force()
-                entry.focus_force()
-
-            def _hide_chat(event=None) -> None:
-                self.chat_open = False
-                chat_win.withdraw()
 
             def _on_submit(event=None):
                 msg = entry.get().strip()
                 if not msg:
+                    if auto_hide_on_send:
+                        _hide_chat()
                     return "break"
                 entry.delete(0, "end")
                 _append_history("player", "You (Vault 111)", msg)
                 status_var.set("● Lucy is thinking...")
+                if auto_hide_on_send:
+                    _hide_chat()
+                    self._sub_queue.put(("Lucy MacLean", "[Thinking...]", 10.0))
                 if self.on_player_chat:
                     threading.Thread(target=self.on_player_chat, args=(msg,), daemon=True).start()
                 return "break"
 
             hint_lbl.bind("<Button-1>", _show_chat)
             label.bind("<Button-1>", _show_chat)
+            pill_lbl.bind("<Button-1>", _show_chat)
+            pill_inner.bind("<Button-1>", _show_chat)
+            input_frame.bind("<Button-1>", _focus_entry)
+            prompt_lbl.bind("<Button-1>", _focus_entry)
+            entry.bind("<Button-1>", lambda e: chat_win.focus_force())
+            history.bind("<Button-1>", _focus_entry)
             entry.bind("<Return>", _on_submit)
             entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])
             entry.bind("<F8>", lambda e: (_hide_chat(), "break")[1])
@@ -297,4 +498,4 @@ class SubtitleHUD:
             root.after(45, poll)
             root.mainloop()
         except Exception as e:
-            print(f"[HUD] Graphic overlay error ({e}); using console.", flush=True)
+            print(f"[HUD] Overlay unavailable ({e}); falling back to console.", flush=True)

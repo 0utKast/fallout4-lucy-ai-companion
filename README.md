@@ -25,7 +25,7 @@
 Unlike traditional scripted companions limited to a fixed dialogue tree—or cloud-dependent AI mods that require paid API keys and suffer from network lag—this project runs **100% locally on your own PC**:
 - **🔒 100% Offline & Zero Cloud Dependency:** No OpenAI/ElevenLabs subscriptions, no API keys, no internet connection required during gameplay, and **$0.00 cost forever**.
 - **⚡ Smooth Performance on Mid-Range Hardware (RTX 3060):** Specifically engineered and benchmarked on a **mid-range, previous-generation GPU (NVIDIA GeForce RTX 3060 12 GB + Intel Core i7-12700)**. By running token-streamed LLM inference (`qwen2.5:3b`) and neural TTS (`Kokoro-ONNX 82M`) on CPU P-cores (`num_gpu=0`), **Fallout 4 keeps 100% of your GPU's 3D pipeline and VRAM** with **zero frame drops** (`0.00s` latency on gameplay barks and `~1.8s` Time-To-First-Audio on open-ended live chat).
-- **💬 Real-Time Open Conversation (`F8` Live Chat) + Spoken Voice:** Press **`F8`** at any moment to open an in-game Pip-Boy terminal, type **any question or comment**, and hear Lucy answer you **in her own voice** clause-by-clause while her response streams onto your screen.
+- **💬 Seamless In-Game Pip-Boy Chat HUD Overlay + Spoken Voice (v1.1.0):** Open a frameless Vault-Tec Pip-Boy HUD overlay directly inside the lower third of your Fallout 4 screen (via **Option 1 on Lucy's `E` Companion Menu**, the **`[Lucy] 0. Open In-Game Pip-Boy Chat HUD`** Favorites Wheel hotkey, or the bottom-right **`[● PIP-BOY COMMS]`** HUD pill). Type any question, press **`ENTER`**, and with **`Auto-Resume Game: ON`** the HUD automatically hides and returns control to Fallout 4 while Lucy answers you out loud clause-by-clause with in-game subtitles!
 - **🧠 Deep Persistent SQLite RAG Memory (TV Series Seasons 1 & 2 + Fallout Lore):** Lucy remembers every detail of her life in Vault 33, her father Hank MacLean's betrayal at Shady Sands, Cooper Howard (The Ghoul) cutting off her finger outside the Super Duper Mart and selling her to Snip-Snip, Maximus, her brother Norm discovering "Bud's Buds" in Vault 31, and her pursuit of Hank to New Vegas—while respecting strict **anti-spoiler rules** so she never spoils Fallout 4 quests you haven't played yet.
 - **🤝 Complete Native Fallout 4 Companion Mechanics:**
   - **Vault 111 Exterior Overlook Encounter:** Find Lucy waiting by the exterior control console outside Vault 111 after she tracks your cryogenic pod's depressurization signal from a Vault-Tec terminal in New Vegas.
@@ -128,15 +128,15 @@ into your `Fallout 4\Data` folder and enable `*LucyCompanionFO4.esp` in your mod
 python english_edition/build_lucy_mod.py --install
 ```
 
-### Step 3: Start the Local AI Bridge Server
-Run **`python start_lucy_bridge.py`** (or `python bridge/server.py`) and **`python open_lucy_chat.py`** inside the `Lucy_AI_Bridge_EN` folder.
-- The live Pip-Boy chat window and subtitle overlay will appear on your screen.
+### Step 3: Start the Local AI Bridge Server (Includes Built-In In-Game HUD Overlay!)
+Run **`python start_lucy_bridge.py`** inside the `Lucy_AI_Bridge_EN` folder:
+- Automatically verifies `Fallout4Custom.ini` (`bEnableTrace=1`) and configures `Fallout4Prefs.ini` (`bBorderless=1`, `bFull Screen=0`) so the **Frameless In-Game Pip-Boy HUD Overlay** renders directly inside your Fallout 4 screen without minimizing the game.
 
-### Step 4: Meet, Recruit & Chat with Lucy in Fallout 4!
+### Step 4: Meet, Recruit & Chat with Lucy Inside Fallout 4!
 1. **Meet Lucy Outside Vault 111:** Walk out of Vault 111 (or fast-travel to Vault 111 on an existing save). Lucy is waiting right next to the **Vault 111 exterior elevator control console** (`~12.5m` off the elevator platform). *(You can also use **`[Lucy] 4. Call / Summon Lucy Here`** in your Pip-Boy `Aid` tab to bring her directly to you).*
 2. **Recruit Her (`E`):** Walk up to her and press **`E`** to read her story and recruit her as your companion (*"Okey-dokey, let's get to it!"*), or leave her waiting at the Vault 111 overlook until you need her.
-3. **Companion Menu (`E`):** Anytime she is traveling with you, press **`E`** on her to open her 7-option Companion Menu (Ask opinion, Tell story, Trade inventory, Follow/Wait, Check Affinity & Perk, Dismiss).
-4. **Live Interactive Voice & Text Chat (`F8`):** Press **`F8`** at any moment to open the live Pip-Boy chat window, type any question in English, press **`Enter`**, and hear Lucy respond in real time! Press **`ESC`** or **`F8`** to minimize the chat and return to gameplay.
+3. **Companion Menu (`E`):** Anytime she is traveling with you, press **`E`** on her to open her 8-option Companion Menu (1. Open In-Game Pip-Boy Chat HUD, 2. Ask opinion, 3. Tell story, 4. Trade inventory, 5. Follow/Wait, 6. Check Affinity & Perk, 7. Dismiss).
+4. **Seamless In-Game Pip-Boy Chat HUD:** Open the frameless In-Game Chat HUD directly inside Fallout 4 by selecting **Option 1 on Lucy's `E` Menu**, pressing your **Favorites Hotkey** bound to **`[Lucy] 0. Open In-Game Pip-Boy Chat HUD`**, or clicking the **`[● PIP-BOY COMMS: LUCY]`** HUD pill at the bottom-right corner. Type your question and press **`ENTER`**—with **`Auto-Resume Game: ON`**, control returns immediately to Fallout 4 while Lucy speaks her answer out loud!
 
 ---
 ---
@@ -193,14 +193,14 @@ Puedes copiar directamente los 3 archivos ya compilados de [`spanish_edition/bui
 python spanish_edition/build_lucy_mod.py --install
 ```
 
-### Paso 3: Iniciar el Servidor Puente de IA Local
-Ejecuta **`python iniciar_lucy_bridge.py`** (o `python bridge/server.py`) y **`python abrir_chat_lucy.py`** dentro de la carpeta `Lucy_AI_Bridge_ES`.
-- Verás aparecer la ventana interactiva de comunicaciones Pip-Boy y los subtítulos HUD en pantalla.
+### Paso 3: Iniciar el Servidor Puente de IA Local (¡Con HUD Integrado en Pantalla!)
+Ejecuta **`python iniciar_lucy_bridge.py`** dentro de la carpeta `Lucy_AI_Bridge_ES`.
+- Configura automáticamente `Fallout4Custom.ini` (`bEnableTrace=1`) y `Fallout4Prefs.ini` (`bBorderless=1`, `bFull Screen=0`) para que el **HUD de Chat y Subtítulos Pip-Boy sin bordes** se dibuje directamente dentro de la pantalla de Fallout 4.
 
-### Paso 4: ¡Juega, Recluta a Lucy y Chatea en Tiempo Real!
+### Paso 4: ¡Juega, Recluta a Lucy y Chatea Dentro de Fallout 4!
 1. **Encuentro en el Refugio 111:** Al salir del ascensor del Refugio 111 (o viajando rápido al Refugio 111 en tu partida actual), encontrarás a Lucy esperando junto a la consola de control exterior del Refugio 111. *(También puedes usar el objeto **`[Lucy] 4. Llamar / Acercar a Lucy aquí`** en la pestaña `Ayuda` de tu Pip-Boy).*
 2. **Reclutamiento y Menú de Compañera (`E`):** Pulsa **`E`** sobre ella para conocer su historia, reclutarla como compañera o darle órdenes e intercambiar inventario.
-3. **Chat Libre por Voz (`F8`):** Pulsa **`F8`** en cualquier momento para escribir cualquier pregunta y escuchar a Lucy contestarte con su voz en tiempo real.
+3. **Chat HUD Pip-Boy Integrado en Pantalla (v1.1.0):** Abre el HUD de Chat sin bordes directamente dentro de Fallout 4 eligiendo la **Opción 1 del menú `E` de Lucy**, asignando **`[Lucy] 0. Abrir Chat HUD Pip-Boy en Pantalla`** a una tecla de Favoritos (`Q`), o pulsando la píldora **`[● COMMS PIP-BOY: LUCY]`** abajo a la derecha. Escribe tu pregunta y pulsa **`ENTER`**: con **`Volver al Juego: SÍ`**, el HUD se oculta al instante devolviendo el control a Fallout 4 mientras Lucy te responde en voz alta y con subtítulos en pantalla.
 
 ---
 

@@ -173,6 +173,12 @@ def process_snapshot(
     else:
         last_chat_at = time.monotonic()
 
+    if ev == "open_chat":
+        last_chat_at = time.monotonic()
+        if hud:
+            hud.open_chat()
+        return Result(dict(FALLBACK_ACTION), personas.current()["ollama_model"], 0.0)
+
     # Si aún no ha sido reclutada como compañera, silenciar comentarios ambientales heartbeat
     if ev == "heartbeat" and snapshot.get("companion", {}).get("recruited") is False:
         return Result(dict(FALLBACK_ACTION), personas.current()["ollama_model"], 0.0)
@@ -377,6 +383,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
 
+        if self.path == "/open_chat":
+            if self.hud:
+                self.hud.open_chat()
+            payload = json.dumps({"ok": True, "hud_active": bool(self.hud)}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         if self.path == "/chat_stream":
             text = body.get("text", "")
             if self.hud:
@@ -443,7 +460,7 @@ def _parse_snap_line(line: str, marker: str) -> dict | None:
 
 def _snap_priority(snap: dict) -> int:
     ev = snap.get("event", "heartbeat")
-    if ev == "hotkey":
+    if ev in ("hotkey", "open_chat"):
         return 3
     if ev != "heartbeat":
         return 2

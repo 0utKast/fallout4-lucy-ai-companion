@@ -9,6 +9,7 @@ Potion Property CmdAskItem Auto
 Potion Property CmdFollowWaitItem Auto
 Potion Property CmdLoreItem Auto
 Potion Property CmdSummonItem Auto
+Potion Property CmdChatItem Auto
 Armor Property Vault33SuitItem Auto
 Book Property LucyJournalItem Auto
 Message Property MesgRecruitMenu Auto
@@ -71,6 +72,9 @@ Function EnsurePlayerItems()
     endif
     if CmdSummonItem != None && kPlayer.GetItemCount(CmdSummonItem) < 1
         kPlayer.AddItem(CmdSummonItem, 1, true)
+    endif
+    if CmdChatItem != None && kPlayer.GetItemCount(CmdChatItem) < 1
+        kPlayer.AddItem(CmdChatItem, 1, true)
     endif
 EndFunction
 
@@ -378,18 +382,20 @@ Function OnLucyActivated()
     endif
     int iBtn = MesgCompanionMenu.Show(fAff)
     if iBtn == 0
-        CommandAskWhatDoYouThink()
+        CommandOpenInGameChat()
     elseif iBtn == 1
-        CommandTellLoreStory()
+        CommandAskWhatDoYouThink()
     elseif iBtn == 2
-        LucyRef.OpenInventory(true)
+        CommandTellLoreStory()
     elseif iBtn == 3
-        CommandToggleFollowWait()
+        LucyRef.OpenInventory(true)
     elseif iBtn == 4
+        CommandToggleFollowWait()
+    elseif iBtn == 5
         if MesgAffinityStatus != None
             MesgAffinityStatus.Show(fAff)
         endif
-    elseif iBtn == 5
+    elseif iBtn == 6
         CommandDismissLucy()
     endif
 EndFunction
@@ -471,6 +477,11 @@ Function TriggerSnapshot(string asEventName)
     Debug.OpenUserLog("LucyCompanionBridge")
     iHeartbeatCounter = 0
     EmitSnapshot(asEventName)
+EndFunction
+
+Function CommandOpenInGameChat()
+    Debug.Notification("[Chat HUD Pip-Boy abierto en pantalla — Escribe a Lucy y pulsa ENTER]")
+    TriggerSnapshot("open_chat")
 EndFunction
 
 Function CommandAskWhatDoYouThink()

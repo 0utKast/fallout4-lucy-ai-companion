@@ -584,6 +584,13 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             "Lucy Command: Summon Lucy Here",
             "LucyCmdSummonScript",
             0x01000843,
+        )
+        + make_cmd_mgef(
+            0x01000854,
+            "MgefLucyCmdChat",
+            "Lucy Command: Open In-Game Pip-Boy Chat HUD",
+            "LucyCmdChatScript",
+            0x01000844,
         ),
     )
 
@@ -769,6 +776,13 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             "[Lucy] 4. Call / Summon Lucy Here",
             "Assign to Favorites (Q). Teleports Lucy MacLean directly to your side and sets her to Follow mode.",
             0x01000853,
+        )
+        + make_cmd_alch(
+            0x01000844,
+            "AlchLucyCmdChat",
+            "[Lucy] 0. Open In-Game Pip-Boy Chat HUD",
+            "Assign to Favorites (Q). Opens the frameless Pip-Boy Live Chat HUD directly on your Fallout 4 screen so you can type to Lucy without leaving the game.",
+            0x01000854,
         ),
     )
 
@@ -1101,16 +1115,17 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
         (
             "\"Okey-dokey! What do you need, Vault 111 partner?\"\n\n"
             "• Current Affinity with Lucy: %.0f / 1000\n"
-            "• Tip: Press F8 at any time to open the live voice & text chat window with Lucy."
+            "• Tip: Select Option 1 (or bind '[Lucy] 0. Open In-Game Pip-Boy Chat HUD' to Favorites Q) to open the in-game Pip-Boy Chat HUD on screen."
         ),
         [
-            "1. What do you think of this place? (AI)",
-            "2. Tell me a story about Vault 33 or your journey",
-            "3. Trade gear (Open inventory)",
-            "4. Wait here / Follow me (Toggle order)",
-            "5. Check Affinity & \"The Golden Rule\" Perk status",
-            "6. Dismiss (Send to the Vault 111 overlook)",
-            "7. Close",
+            "1. Open In-Game Pip-Boy Chat HUD (Type to Lucy)",
+            "2. What do you think of this place? (AI)",
+            "3. Tell me a story about Vault 33 or your journey",
+            "4. Trade gear (Open inventory)",
+            "5. Wait here / Follow me (Toggle order)",
+            "6. Check Affinity & \"The Golden Rule\" Perk status",
+            "7. Dismiss (Send to the Vault 111 overlook)",
+            "8. Close",
         ],
     )
 
@@ -1183,6 +1198,7 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             ("CmdFollowWaitItem", 0x01000841),
             ("CmdLoreItem", 0x01000842),
             ("CmdSummonItem", 0x01000843),
+            ("CmdChatItem", 0x01000844),
             ("Vault33SuitItem", 0x01000813),
             ("LucyJournalItem", 0x01000860),
             ("MesgRecruitMenu", 0x01000870),

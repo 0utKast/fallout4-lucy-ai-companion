@@ -584,6 +584,13 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             "Orden de Lucy: Llamar a Lucy aquí",
             "LucyCmdSummonScript",
             0x01000843,
+        )
+        + make_cmd_mgef(
+            0x01000854,
+            "MgefLucyCmdChat",
+            "Orden de Lucy: Abrir Chat HUD Pip-Boy en Pantalla",
+            "LucyCmdChatScript",
+            0x01000844,
         ),
     )
 
@@ -769,6 +776,13 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             "[Lucy] 4. Llamar / Acercar a Lucy aquí",
             "Asígnalo a Favoritos (Q). Acerca a Lucy MacLean directamente a tu lado (o abre su menú de reclutamiento si aún no es tu compañera).",
             0x01000853,
+        )
+        + make_cmd_alch(
+            0x01000844,
+            "AlchLucyCmdChat",
+            "[Lucy] 0. Abrir Chat HUD Pip-Boy en Pantalla",
+            "Asígnalo a Favoritos (Q). Abre el HUD de Chat Pip-Boy sin bordes directamente sobre la pantalla de Fallout 4 para escribir a Lucy sin salir del juego.",
+            0x01000854,
         ),
     )
 
@@ -1101,16 +1115,17 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
         (
             "«¡Oki-doki! ¿Qué necesitas, compañero del Refugio 111?»\n\n"
             "• Afinidad actual con Lucy: %.0f / 1000\n"
-            "• Consejo: Pulsa F8 en cualquier momento para abrir el chat libre por voz con Lucy."
+            "• Consejo: Elige la Opción 1 (o asigna «[Lucy] 0. Abrir Chat HUD Pip-Boy en Pantalla» a Favoritos Q) para abrir el chat HUD en pantalla."
         ),
         [
-            "1. ¿Qué opinas de este lugar? (IA)",
-            "2. Cuéntame algo del Refugio 33 o de tu viaje",
-            "3. Intercambiar equipo (Abrir inventario)",
-            "4. Esperar aquí / Seguirme (Cambiar orden)",
-            "5. Consultar estado de Afinidad y Ventaja «La Regla de Oro»",
-            "6. Despedir (Enviar a la explanada del Refugio 111)",
-            "7. Cerrar",
+            "1. Abrir Chat HUD Pip-Boy en Pantalla (Escribir a Lucy)",
+            "2. ¿Qué opinas de este lugar? (IA)",
+            "3. Cuéntame algo del Refugio 33 o de tu viaje",
+            "4. Intercambiar equipo (Abrir inventario)",
+            "5. Esperar aquí / Seguirme (Cambiar orden)",
+            "6. Consultar estado de Afinidad y Ventaja «La Regla de Oro»",
+            "7. Despedir (Enviar a la explanada del Refugio 111)",
+            "8. Cerrar",
         ],
     )
 
@@ -1183,6 +1198,7 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
             ("CmdFollowWaitItem", 0x01000841),
             ("CmdLoreItem", 0x01000842),
             ("CmdSummonItem", 0x01000843),
+            ("CmdChatItem", 0x01000844),
             ("Vault33SuitItem", 0x01000813),
             ("LucyJournalItem", 0x01000860),
             ("MesgRecruitMenu", 0x01000870),

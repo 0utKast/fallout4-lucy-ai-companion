@@ -1,8 +1,10 @@
-"""Asegura que Fallout4Custom.ini (y Fallout4VrCustom.ini en Fallout 4 VR) tenga activado el registro Papyrus
-(bEnableTrace=1) para que tanto Fallout 4 como Fallout 4 VR puedan enviar los snapshots JSON al bridge local de Lucy."""
+"""Asegura que Fallout4Custom.ini (y Fallout4VrCustom.ini) tenga activado el registro Papyrus (bEnableTrace=1)
+y que Fallout4Prefs.ini esté en modo Ventana sin Bordes (bBorderless=1, bFull Screen=0) para que el
+HUD de Subtítulos y Chat Pip-Boy en Pantalla se dibuje directamente dentro de Fallout 4 sin minimizar el juego."""
 
 import configparser
 from pathlib import Path
+import re
 
 
 def _enable_papyrus_in_file(custom_ini: Path) -> None:
@@ -32,6 +34,32 @@ def _enable_papyrus_in_file(custom_ini: Path) -> None:
         print(f"[INI] Soporte de logs Papyrus ya estaba activo en {custom_ini}", flush=True)
 
 
+def _ensure_borderless_in_prefs(prefs_ini: Path) -> None:
+    if not prefs_ini.exists():
+        return
+    try:
+        raw = prefs_ini.read_text(encoding="utf-8")
+        enc = "utf-8"
+    except Exception:
+        raw = prefs_ini.read_text(encoding="latin-1")
+        enc = "latin-1"
+
+    new_raw = re.sub(r"(?im)^(\s*bBorderless\s*=\s*)0\s*$", r"\g<1>1", raw)
+    new_raw = re.sub(r"(?im)^(\s*bFull Screen\s*=\s*)1\s*$", r"\g<1>0", new_raw)
+
+    if new_raw != raw:
+        prefs_ini.write_text(new_raw, encoding=enc)
+        print(
+            f"[INI] Activado modo Pantalla Completa sin Bordes (bBorderless=1, bFull Screen=0) en {prefs_ini} para el HUD integrado en el juego.",
+            flush=True,
+        )
+    else:
+        print(
+            f"[INI] Modo Pantalla Completa sin Bordes ya activo en {prefs_ini} (HUD integrado en pantalla listo).",
+            flush=True,
+        )
+
+
 def ensure_papyrus_trace() -> None:
     home = Path.home()
     doc_roots = [home / "Documents" / "My Games", home / "OneDrive" / "Documents" / "My Games"]
@@ -47,6 +75,8 @@ def ensure_papyrus_trace() -> None:
                 found_any = True
                 for ini_name in ini_names:
                     _enable_papyrus_in_file(ini_dir / ini_name)
+                if game_folder == "Fallout4":
+                    _ensure_borderless_in_prefs(ini_dir / "Fallout4Prefs.ini")
 
     if not found_any:
         print("[INI] No se encontró todavía My Games/Fallout4 ni My Games/Fallout4VR.", flush=True)
