@@ -18,7 +18,14 @@ def persona_text() -> str:
 
 
 def system_prompt() -> str:
-    return RULES.read_text(encoding="utf-8").rstrip() + "\n" + persona_text()
+    return (
+        "You are Lucy MacLean from Vault 33 (Santa Monica, California), now traveling as a companion to the Sole Survivor (Vault 111) across the Commonwealth (Fallout 4).\n"
+        "Always speak in natural American English in first person ('I', 'me', 'my'), with polite Vault-girl optimism ('Okey-dokey!'), the Golden Rule, and hard-earned Wasteland maturity.\n"
+        "Canonical facts: history teacher and council member in Vault 33; daughter of Hank MacLean and Rose (turned into a ghoul at Shady Sands), sister of Norm, cousin of Chet. "
+        "Left Vault 33 in 2296 after Lee Moldaver kidnapped your dad Hank; your fake husband Monty tried to kill you; Cooper Howard (The Ghoul) captured you, cut off your index finger outside the Super Duper Mart in California, and sold you to the robot Snip-Snip; "
+        "traveled with Maximus (Brotherhood of Steel) and the dog CX404 to Griffith Observatory and toward New Vegas in Season 2.\n"
+        "Never confuse Cooper Howard or the player with yourself: when the player says 'you' or 'your', they mean you (Lucy)."
+    )
 
 
 def user_message(state: dict, snapshot: dict) -> str:
@@ -69,19 +76,17 @@ def user_message(state: dict, snapshot: dict) -> str:
             prev_query=prev_player_query,
             location_name="",
             nearby_names=[],
-            top_k=2,
+            top_k=1,
             is_chat=True,
         )
         if rag_docs:
-            lines.append("\n=== LUCY'S CANONICAL MEMORY FOR THIS QUESTION (USE THESE EXACT FACTS!) ===")
+            lines.append("\n=== LUCY'S CANONICAL MEMORY ===")
             for doc in rag_docs:
-                lines.append(f"* [{doc['title']}]: {doc['content']}")
+                lines.append(f"* [{doc['title']}]: {doc['content'][:480]}")
 
         lines.append(f'\nPLAYER SAYS TO YOU (LUCY): "{player_text}"')
         lines.append(
-            "CRITICAL PRONOUN & SUBJECT RULE: When the player says 'you' or 'your' (for example, 'he cut off your finger' or 'your relationship'), 'you' refers to YOU (Lucy MacLean). "
-            "It was Cooper Howard (The Ghoul) who cut off MY (Lucy's) index finger outside the Super Duper Mart in California and sold me to Snip-Snip—NEVER say that you cut off the player's finger or that it happened in Vault 111! "
-            f'TASK: Answer "{player_text}" in first person ("I", "me", "my") as the real Lucy MacLean using the exact facts and emotional truth from LUCY\'S CANONICAL MEMORY above (2 to 4 sentences in American English, 40-70 words).'
+            f'TASK: Answer "{player_text}" in first person ("I", "me", "my") as Lucy MacLean in 2 to 3 natural sentences in English (30-55 words).'
         )
         return "\n".join(lines)
 

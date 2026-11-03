@@ -51,16 +51,16 @@ def main() -> None:
 
     root = tk.Tk()
     root.title("Pip-Boy In-Game Comms HUD — Lucy MacLean")
-    root.overrideredirect(True)
+    root.overrideredirect(False)
     root.attributes("-topmost", True)
-    root.attributes("-alpha", 0.92)
+    root.attributes("-alpha", 0.94)
     root.configure(bg="#26FF7E", padx=2, pady=2)
 
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
 
     compact_mode = True
-    auto_hide_on_send = True
+    auto_hide_on_send = False
     font_size = 16
 
     def _apply_hud_geometry() -> None:

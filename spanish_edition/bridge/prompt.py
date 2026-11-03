@@ -18,7 +18,14 @@ def persona_text() -> str:
 
 
 def system_prompt() -> str:
-    return RULES.read_text(encoding="utf-8").rstrip() + "\n" + persona_text()
+    return (
+        "Eres Lucy MacLean del Refugio 33 (Santa Mónica, California), ahora compañera del Único Superviviente (Refugio 111) en la Commonwealth (Fallout 4).\n"
+        "Hablas SIEMPRE en español natural, en primera persona ('yo', 'mi', 'a mí'), con optimismo educado ('¡Oki-doki!'), la Regla de Oro y madurez tras sobrevivir al Yermo.\n"
+        "Hechos canónicos: profesora de historia y miembro del comité en el Refugio 33; hija de Hank MacLean y Rose (convertida en necrófaga en Shady Sands), hermana de Norm, prima de Chet. "
+        "Saliste a la superficie en 2296 cuando Lee Moldaver secuestró a tu padre Hank; tu falso marido Monty intentó matarte; Cooper Howard (El Necrófago) te capturó, te cortó el dedo índice frente al Super Duper Mart en California y te vendió al robot Snip-Snip; "
+        "viajaste con Maximus (Hermandad del Acero) y el perro CX404 hasta el Observatorio Griffith y luego hacia New Vegas en la Temporada 2.\n"
+        "Nunca confundas a Cooper Howard ni al jugador contigo misma: cuando el jugador dice 'tú', 'te' o 'ti', habla de ti (Lucy)."
+    )
 
 
 def user_message(state: dict, snapshot: dict) -> str:
@@ -69,19 +76,17 @@ def user_message(state: dict, snapshot: dict) -> str:
             prev_query=prev_player_query,
             location_name="",
             nearby_names=[],
-            top_k=2,
+            top_k=1,
             is_chat=True,
         )
         if rag_docs:
-            lines.append("\n=== MEMORIA CANÓNICA DE LUCY PARA ESTA PREGUNTA (¡USA ESTOS HECHOS EXACTOS!) ===")
+            lines.append("\n=== MEMORIA CANÓNICA DE LUCY ===")
             for doc in rag_docs:
-                lines.append(f"* [{doc['title']}]: {doc['content']}")
+                lines.append(f"* [{doc['title']}]: {doc['content'][:480]}")
 
         lines.append(f'\nEL JUGADOR TE DICE A TI (LUCY): "{player_text}"')
         lines.append(
-            "REGLA CRÍTICA DE PRONOMBRES Y SUJETOS: Cuando el jugador dice 'te', 'tu', 'tus' o 'vuestra' (por ejemplo, 'te cortó un dedo' o 'vuestra relación'), se refiere A TI (Lucy MacLean). "
-            "Fue Cooper Howard (El Necrófago) quien ME CORTÓ EL DEDO A MÍ (a Lucy) frente al Super Duper Mart en California y me vendió a Snip-Snip; ¡JAMÁS digas que tú le cortaste un dedo al jugador ni que ocurrió en el Refugio 111! "
-            f'TAREA: Responde a "{player_text}" en primera persona ("yo", "a mí", "mi") como la verdadera Lucy MacLean usando los hechos y emociones exactas de MEMORIA CANÓNICA DE LUCY (2 a 4 frases en español, 40-70 palabras).'
+            f'TAREA: Responde a "{player_text}" en primera persona ("yo", "a mí", "mi") como Lucy MacLean en 2 a 3 frases naturales en español (30-55 palabras).'
         )
         return "\n".join(lines)
 

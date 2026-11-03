@@ -144,16 +144,17 @@ class SubtitleHUD:
             pill_close.pack(side="right")
             pill_close.bind("<Button-1>", lambda e: _dismiss_pill())
 
-            # 3. Frameless In-Game Pip-Boy Chat HUD Overlay (Docked at Lower Screen)
+            # 3. In-Game Pip-Boy Chat HUD Overlay (Docked at Lower Screen, Native Keyboard Focus Guaranteed)
             chat_win = tk.Toplevel(root)
+            chat_win.title("Pip-Boy Comms HUD // Lucy MacLean (Vault 33)")
             chat_win.withdraw()
-            chat_win.overrideredirect(True)
+            chat_win.overrideredirect(False)
             chat_win.attributes("-topmost", True)
-            chat_win.attributes("-alpha", 0.92)
+            chat_win.attributes("-alpha", 0.94)
             chat_win.configure(bg="#26FF7E", padx=2, pady=2)
 
             compact_mode = True
-            auto_hide_on_send = True
+            auto_hide_on_send = False
             font_size = 16
 
             def _apply_hud_geometry() -> None:
@@ -367,10 +368,10 @@ class SubtitleHUD:
 
             btn_auto = tk.Button(
                 header,
-                text=" Auto-Resume Game: ON ",
+                text=" Auto-Resume Game: OFF ",
                 font=("Consolas", 10, "bold"),
-                fg="#08110B",
-                bg="#26FF7E",
+                fg="#26FF7E",
+                bg="#13261A",
                 activebackground="#69F0AE",
                 relief="flat",
                 command=_toggle_auto_hide,
@@ -407,9 +408,11 @@ class SubtitleHUD:
                 nonlocal streaming_line_active
                 history.config(state="normal")
                 if role == "lucy_stream":
-                    if streaming_line_active:
-                        history.delete("end-2l", "end-1c")
-                        history.insert("end", "\n")
+                    if streaming_line_active and "lucy_turn_start" in history.mark_names():
+                        history.delete("lucy_turn_start", "end-1c")
+                    else:
+                        history.mark_set("lucy_turn_start", "end-1c")
+                        history.mark_gravity("lucy_turn_start", "left")
                     history.insert("end", f"{speaker}: ", "lucy_tag")
                     history.insert("end", f"{text}\n", "lucy_msg")
                     streaming_line_active = True
@@ -439,10 +442,12 @@ class SubtitleHUD:
                     return "break"
                 entry.delete(0, "end")
                 _append_history("player", "You (Vault 111)", msg)
-                status_var.set("● Lucy is thinking...")
+                status_var.set("● Lucy is replying...")
                 if auto_hide_on_send:
                     _hide_chat()
-                    self._sub_queue.put(("Lucy MacLean", "[Thinking...]", 10.0))
+                    self._sub_queue.put(("Lucy MacLean", "[Thinking...]", 15.0))
+                else:
+                    _focus_entry()
                 if self.on_player_chat:
                     threading.Thread(target=self.on_player_chat, args=(msg,), daemon=True).start()
                 return "break"
@@ -453,7 +458,7 @@ class SubtitleHUD:
             pill_inner.bind("<Button-1>", _show_chat)
             input_frame.bind("<Button-1>", _focus_entry)
             prompt_lbl.bind("<Button-1>", _focus_entry)
-            entry.bind("<Button-1>", lambda e: chat_win.focus_force())
+            entry.bind("<Button-1>", _focus_entry)
             history.bind("<Button-1>", _focus_entry)
             entry.bind("<Return>", _on_submit)
             entry.bind("<Escape>", lambda e: (_hide_chat(), "break")[1])

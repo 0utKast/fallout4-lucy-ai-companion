@@ -192,7 +192,7 @@ def decide(
     ev = snapshot.get("event")
     is_story = ev == "campfire"
     is_chat = ev == "player_chat"
-    max_tokens = 200 if (is_story or is_chat) else 90
+    max_tokens = 115 if (is_story or is_chat) else 75
     max_say = 850 if (is_story or is_chat) else 320
     allow_okey = bool(snapshot.get("allow_okey_dokey", False))
 
@@ -263,7 +263,8 @@ def decide(
                 "stream": True,
                 "keep_alive": -1,
                 "options": {
-                    "num_ctx": 2048,
+                    "num_gpu": 99,
+                    "num_ctx": 1024,
                     "num_predict": max_tokens,
                     "temperature": 0.55,
                     "top_p": 0.88,
