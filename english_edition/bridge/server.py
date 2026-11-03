@@ -19,7 +19,7 @@ from typing import Callable
 import memory
 import personas
 from barks import is_bark_event, pick_bark_text
-from decide import FALLBACK_ACTION, Result, decide
+from decide import FALLBACK_ACTION, Result, decide, ensure_ollama_running
 from fo4_resolver import build_or_load_forms_db, enrich_papyrus_snapshot
 from hud_subtitle import SubtitleHUD
 from lore_rag import get_lore_rag
@@ -288,7 +288,7 @@ def process_snapshot(
         result = decide(
             state,
             snapshot,
-            timeout_s=15.0 if is_chat else 12.0,
+            timeout_s=30.0 if is_chat else 20.0,
             on_clause=_on_clause if (voice or hud or stream_cb) else None,
         )
 
@@ -303,6 +303,15 @@ def process_snapshot(
         result.decision["say"] = say_raw
 
         say_text = (result.decision.get("say") or "").strip()
+        if not say_text and is_chat:
+            say_text = (
+                "Okey-dokey! I'm Lucy MacLean from Vault 33 in Santa Monica! I stepped out into the Wasteland to rescue my dad Hank, "
+                "and now I'm traveling across the Commonwealth with you following the Golden Rule. Ask me anything!"
+            )
+            result.decision["say"] = say_text
+            result.error = ""
+            result.problems = []
+
         if say_text:
             said_lately.append(say_text)
             del said_lately[:-10]
@@ -539,9 +548,10 @@ def run_server() -> None:
 
     # Warm up the active model on CPU P-cores (num_gpu=0) so the KV cache is pre-filled (<1.2s TTFA)
     try:
-        w_res = decide(load_state(), {"event": "summoned", "recent_events": ["Warmup."]}, timeout_s=20.0)
+        ensure_ollama_running()
+        w_res = decide(load_state(), {"event": "summoned", "recent_events": ["Warmup."]}, timeout_s=25.0)
         print(
-            f"[Warmup] Model {cfg['ollama_model']} hot on CPU P-cores (num_gpu=0, 0% GPU contention): "
+            f"[Warmup] Model {cfg['ollama_model']} ready: "
             f"{w_res.latency_s:.2f}s ({w_res.tokens_per_s} tok/s).",
             flush=True,
         )

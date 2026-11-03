@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 import re
 import time
 import urllib.error
@@ -14,6 +15,49 @@ from prompt import system_prompt, user_message
 from schema import validate
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+_ollama_autostart_lock = False
+
+
+def ensure_ollama_running() -> bool:
+    """Checks if Ollama responds on 127.0.0.1:11434 and, if stopped, starts the official tray application."""
+    global _ollama_autostart_lock
+    try:
+        with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=1.5) as r:
+            if r.status == 200:
+                return True
+    except Exception:
+        pass
+
+    if _ollama_autostart_lock:
+        return False
+    _ollama_autostart_lock = True
+    try:
+        ollama_dir = Path.home() / "AppData" / "Local" / "Programs" / "Ollama"
+        started_any = False
+        if hasattr(os, "startfile") and ollama_dir.is_dir():
+            for entry in sorted(ollama_dir.iterdir()):
+                if entry.stem.lower() == "ollama app":
+                    print("[Ollama] Local service stopped. Auto-starting Ollama...", flush=True)
+                    os.startfile(str(entry))
+                    started_any = True
+                    break
+        if not started_any:
+            return False
+
+        for _ in range(24):
+            time.sleep(0.5)
+            try:
+                with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=1.5) as r:
+                    if r.status == 200:
+                        print("[Ollama] Local service active at 127.0.0.1:11434.", flush=True)
+                        return True
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[Ollama] Could not auto-start Ollama: {e}", flush=True)
+    finally:
+        _ollama_autostart_lock = False
+    return False
 
 FALLBACK_ACTION = {
     "reason": "default local fallback",
@@ -219,8 +263,6 @@ def decide(
                 "stream": True,
                 "keep_alive": -1,
                 "options": {
-                    "num_gpu": 0,
-                    "num_thread": 8,
                     "num_ctx": 2048,
                     "num_predict": max_tokens,
                     "temperature": 0.55,
@@ -249,7 +291,22 @@ def decide(
                             break
                 tps = (eval_count / (eval_duration_ns / 1e9)) if eval_duration_ns > 0 else 0.0
             except urllib.error.URLError:
-                if llm_backend == "auto":
+                if ensure_ollama_running():
+                    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                        for raw_line in resp:
+                            line = raw_line.decode("utf-8", errors="replace").strip()
+                            if not line:
+                                continue
+                            chunk = json.loads(line)
+                            token_str = chunk.get("message", {}).get("content", "")
+                            if token_str:
+                                _on_token(token_str)
+                            if chunk.get("done"):
+                                eval_count = chunk.get("eval_count", 0)
+                                eval_duration_ns = chunk.get("eval_duration", 0)
+                                break
+                    tps = (eval_count / (eval_duration_ns / 1e9)) if eval_duration_ns > 0 else 0.0
+                elif llm_backend == "auto":
                     model_name = "koboldcpp"
                     eval_count, tps = _stream_koboldcpp(kobold_url, messages, max_tokens, timeout_s, _on_token)
                 else:

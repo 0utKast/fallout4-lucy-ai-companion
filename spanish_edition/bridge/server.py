@@ -19,7 +19,7 @@ from typing import Callable
 import memory
 import personas
 from barks import is_bark_event, pick_bark_text
-from decide import FALLBACK_ACTION, Result, decide
+from decide import FALLBACK_ACTION, Result, decide, ensure_ollama_running
 from fo4_resolver import build_or_load_forms_db, enrich_papyrus_snapshot
 from hud_subtitle import SubtitleHUD
 from lore_rag import get_lore_rag
@@ -288,7 +288,7 @@ def process_snapshot(
         result = decide(
             state,
             snapshot,
-            timeout_s=15.0 if is_chat else 12.0,
+            timeout_s=30.0 if is_chat else 20.0,
             on_clause=_on_clause if (voice or hud or stream_cb) else None,
         )
 
@@ -302,6 +302,15 @@ def process_snapshot(
         result.decision["say"] = say_raw
 
         say_text = (result.decision.get("say") or "").strip()
+        if not say_text and is_chat:
+            say_text = (
+                "¡Oki-doki! Soy Lucy MacLean, del Refugio 33 en Santa Mónica. Salí a la superficie para rescatar a mi padre Hank "
+                "y ahora recorro la Commonwealth contigo siguiendo la Regla de Oro. ¡Pregúntame lo que quieras!"
+            )
+            result.decision["say"] = say_text
+            result.error = ""
+            result.problems = []
+
         if say_text:
             said_lately.append(say_text)
             del said_lately[:-10]
@@ -537,7 +546,8 @@ def run_server() -> None:
     BridgeHandler.voice = voice
 
     try:
-        w_res = decide(load_state(), {"event": "summoned", "recent_events": ["Calentamiento inicial."]}, timeout_s=20.0)
+        ensure_ollama_running()
+        w_res = decide(load_state(), {"event": "summoned", "recent_events": ["Calentamiento inicial."]}, timeout_s=25.0)
         print(
             f"[Warmup-ES] Modelo {cfg['ollama_model']} listo en núcleos P de CPU (num_gpu=0, 0% contención GPU): "
             f"{w_res.latency_s:.2f}s ({w_res.tokens_per_s} tok/s).",
