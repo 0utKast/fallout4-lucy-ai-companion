@@ -24,10 +24,31 @@ FO4_ROOT = r"C:\Program Files (x86)\Steam\steamapps\common\Fallout 4"
 FO4_DATA_DIR = os.path.join(FO4_ROOT, "Data")
 FO4_ESM_PATH = os.path.join(FO4_DATA_DIR, "Fallout4.esm")
 PAPYRUS_COMPILER = os.path.join(FO4_ROOT, "Papyrus Compiler", "PapyrusCompiler.exe")
+FFMPEG_BIN = shutil.which("ffmpeg") or r"C:\ProgramData\chocolatey\bin\ffmpeg.EXE"
+XWMAENCODE_BIN = os.path.join(FO4_ROOT, "Tools", "Audio", "xwmaencode.exe")
 
 PAPYRUS_SRC_DIR = os.path.join(THIS_DIR, "papyrus_src")
 PAPYRUS_OUT_DIR = os.path.join(THIS_DIR, "papyrus_out")
 BUILD_OUT_DIR = os.path.join(THIS_DIR, "build_out")
+
+LUCY_BARK_EVENT_DEFS = [
+    ("v111_greeting", 0x01000890, 0x010008B0),
+    ("recruited", 0x01000891, 0x010008B1),
+    ("recruit_declined", 0x01000892, 0x010008B2),
+    ("dismissed", 0x01000893, 0x010008B3),
+    ("follow_me", 0x01000894, 0x010008B4),
+    ("wait_here", 0x01000895, 0x010008B5),
+    ("combat_start", 0x01000896, 0x010008B6),
+    ("combat_end", 0x01000897, 0x010008B7),
+    ("companion_hurt", 0x01000898, 0x010008B8),
+    ("companion_recovered", 0x01000899, 0x010008B9),
+    ("affinity_like", 0x0100089A, 0x010008BA),
+    ("affinity_love", 0x0100089B, 0x010008BB),
+    ("affinity_dislike", 0x0100089C, 0x010008BC),
+    ("affinity_hate", 0x0100089D, 0x010008BD),
+    ("affinity_max_perk", 0x0100089E, 0x010008BE),
+    ("story_intro", 0x0100089F, 0x010008BF),
+]
 
 ESP_NAME = "LucyCompanionFO4.esp"
 BA2_NAME = "LucyCompanionFO4 - Main.ba2"
@@ -134,6 +155,65 @@ def compile_papyrus_scripts() -> None:
     ]
     subprocess.run(cmd, check=True)
     print("[Papyrus] Compiled 6 scripts into papyrus_out/.")
+
+
+def build_voice_xwm_files() -> tuple[dict[str, str], dict[str, list[str]]]:
+    bridge_dir = os.path.join(THIS_DIR, "bridge")
+    if bridge_dir not in sys.path:
+        sys.path.insert(0, bridge_dir)
+    import barks
+    import personas
+
+    voice_name = personas.current()["kokoro_voice"]
+    xwm_dir = os.path.join(THIS_DIR, "assets", "voice_xwm")
+    os.makedirs(xwm_dir, exist_ok=True)
+
+    ba2_voice_map: dict[str, str] = {}
+    event_anam_map: dict[str, list[str]] = {}
+
+    for ev_name, _sndr_fid, _soun_fid in LUCY_BARK_EVENT_DEFS:
+        lines = barks.BARKS_EN.get(ev_name, [])
+        anam_list: list[str] = []
+        for idx, line_text in enumerate(lines, 1):
+            src_wav = barks.bark_cache_path(line_text, voice_name)
+            if not src_wav.exists():
+                raise FileNotFoundError(f"Missing pre-cached bark WAV for {ev_name}: {src_wav}")
+            stem = f"lucy_{ev_name}_{idx:02d}"
+            tmp_44k = os.path.join(xwm_dir, f"{stem}_44k.wav")
+            dst_xwm = os.path.join(xwm_dir, f"{stem}.xwm")
+            if not os.path.exists(dst_xwm):
+                subprocess.run(
+                    [
+                        FFMPEG_BIN,
+                        "-y",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(src_wav),
+                        "-ar",
+                        "44100",
+                        "-ac",
+                        "1",
+                        "-sample_fmt",
+                        "s16",
+                        tmp_44k,
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    [XWMAENCODE_BIN, "-b", "48000", tmp_44k, dst_xwm],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if os.path.exists(tmp_44k):
+                    os.remove(tmp_44k)
+            ba2_voice_map[f"sound\\fx\\lucycompanionfo4\\{stem.lower()}.xwm"] = dst_xwm
+            anam_list.append(f"Data\\Sound\\FX\\LucyCompanionFO4\\{stem}.wav")
+        event_anam_map[ev_name] = anam_list
+
+    print(f"  [Voice XWM] Prepared {len(ba2_voice_map)} native Fallout 4 voice lines for BA2.")
+    return ba2_voice_map, event_anam_map
 
 
 def build_vault33_materials() -> dict[str, str]:
@@ -509,7 +589,7 @@ def extract_esm_templates() -> dict:
     return found
 
 
-def build_esp_file(tpl: dict, dst_esp: str) -> None:
+def build_esp_file(tpl: dict, dst_esp: str, event_anam_map: dict[str, list[str]]) -> None:
     # 1. GLOB:
     #   0x01000801 GlobLucyWaitMode (1.0 default = Waiting at Vault 111 Overlook)
     #   0x01000802 GlobLucyRecruited (0.0 default = Not Recruited yet, 1.0 = Active Companion)
@@ -948,10 +1028,11 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
                 # PlayerFaction (0x0001C21C) so she fights alongside the player
                 lucy_subs.extend(pack_sub("SNAM", struct.pack("<IB", 0x0001C21C, 0)))
                 wrote_snam = True
-        elif st_n == "AIDT" and ss_n >= 4:
-            sv_n[0] = 1  # Aggressive (attacks enemies in combat)
-            sv_n[1] = 3  # Brave
-            sv_n[3] = 2  # Helps Friends and Allies
+        elif st_n == "AIDT" and ss_n >= 6:
+            sv_n[0] = 0  # Unaggressive (defends player & allies, never initiates hostility on player)
+            sv_n[1] = 4  # Foolhardy (fearless in combat like vanilla companions)
+            sv_n[3] = 0  # Any Crime (prevents engine crime-alarm from turning her hostile to player after combat)
+            sv_n[5] = 2  # Helps Friends and Allies
             lucy_subs.extend(pack_sub("AIDT", bytes(sv_n)))
         elif st_n == "PKID":
             if not wrote_pkid:
@@ -1256,6 +1337,39 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
     w_g1 = b"GRUP" + struct.pack("<IIIII", 24 + len(w_g1_body), 0x0000003C, 1, 0, 0) + w_g1_body
     grup_wrld = pack_grup_top(b"WRLD", wrld_3c_rec + w_g1)
 
+    # 12. SNDR & SOUN: Native Fallout 4 Voice Barks (0x01000890..0x0100089F & 0x010008B0..0x010008BF)
+    def make_lucy_sndr_rec(new_fid: int, edid: str, anam_paths: list[str]) -> bytes:
+        anam_subs = b"".join(pack_zstr("ANAM", p) for p in anam_paths)
+        s_subs = (
+            pack_zstr("EDID", edid)
+            + pack_sub("CNAM", bytes.fromhex("0a54ef1e"))
+            + pack_sub("GNAM", struct.pack("<I", 0x001275CA))  # AudioCategoryUIHolotape (plays in world & during menus)
+            + anam_subs
+            + pack_sub("ONAM", struct.pack("<I", 0x000B4246))  # SOMStereoRad03000
+            + pack_sub("LNAM", bytes.fromhex("00000000"))
+            + pack_sub("BNAM", bytes.fromhex("000000006400"))
+        )
+        return pack_record("SNDR", new_fid, s_subs)
+
+    def make_lucy_soun_rec(new_fid: int, edid: str, sndr_fid: int) -> bytes:
+        so_subs = (
+            pack_zstr("EDID", edid)
+            + pack_sub("OBND", bytes.fromhex("e5ffe5fff4ff1b001b000c00"))
+            + pack_sub("SDSC", struct.pack("<I", sndr_fid))
+        )
+        return pack_record("SOUN", new_fid, so_subs)
+
+    sndr_records_bytes = b"".join(
+        make_lucy_sndr_rec(sndr_fid, f"SNDR_Lucy_{ev_name}", event_anam_map[ev_name])
+        for ev_name, sndr_fid, _soun_fid in LUCY_BARK_EVENT_DEFS
+    )
+    soun_records_bytes = b"".join(
+        make_lucy_soun_rec(soun_fid, f"SOUN_Lucy_{ev_name}", sndr_fid)
+        for ev_name, sndr_fid, soun_fid in LUCY_BARK_EVENT_DEFS
+    )
+    grup_sndr = pack_grup_top(b"SNDR", sndr_records_bytes)
+    grup_soun = pack_grup_top(b"SOUN", soun_records_bytes)
+
     all_grups = (
         grup_glob
         + grup_mgef
@@ -1269,6 +1383,8 @@ def build_esp_file(tpl: dict, dst_esp: str) -> None:
         + grup_pack
         + grup_perk
         + grup_mesg
+        + grup_sndr
+        + grup_soun
         + grup_qust
         + grup_wrld
     )
@@ -1333,6 +1449,8 @@ def main() -> None:
     compile_papyrus_scripts()
 
     ba2_files = build_vault33_materials()
+    voice_xwm_map, event_anam_map = build_voice_xwm_files()
+    ba2_files.update(voice_xwm_map)
     for fn in sorted(os.listdir(PAPYRUS_OUT_DIR)):
         if fn.endswith(".pex"):
             src_pex = os.path.join(PAPYRUS_OUT_DIR, fn)
@@ -1345,7 +1463,7 @@ def main() -> None:
     staged_ba2 = os.path.join(BUILD_OUT_DIR, BA2_NAME)
     staged_tex_ba2 = os.path.join(BUILD_OUT_DIR, TEX_BA2_NAME)
 
-    build_esp_file(tpl, staged_esp)
+    build_esp_file(tpl, staged_esp, event_anam_map)
     build_ba2_archive(staged_ba2, ba2_files)
     build_vault33_textures_ba2(staged_tex_ba2)
 

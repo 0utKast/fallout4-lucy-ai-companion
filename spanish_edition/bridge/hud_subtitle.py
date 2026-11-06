@@ -154,7 +154,7 @@ class SubtitleHUD:
             chat_win.configure(bg="#26FF7E", padx=2, pady=2)
 
             compact_mode = True
-            auto_hide_on_send = False
+            auto_hide_on_send = True
             font_size = 16
 
             def _apply_hud_geometry() -> None:
@@ -300,16 +300,83 @@ class SubtitleHUD:
 
             _apply_font_size(font_size)
 
-            def _focus_entry(event=None) -> None:
+            last_game_hwnd = [0]
+
+            def _record_game_hwnd() -> None:
                 try:
-                    chat_win.lift()
-                    chat_win.focus_force()
-                    entry.focus_set()
-                    entry.focus_force()
+                    import ctypes
+                    user32 = ctypes.windll.user32
+                    fo4 = user32.FindWindowW("Fallout4", None)
+                    if fo4:
+                        last_game_hwnd[0] = fo4
+                        return
+                    fg = user32.GetForegroundWindow()
+                    chat_hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
+                    if fg and fg not in (chat_hwnd, root.winfo_id(), pill_win.winfo_id()):
+                        last_game_hwnd[0] = fg
                 except Exception:
                     pass
 
+            def _restore_game_focus() -> None:
+                try:
+                    import ctypes
+                    user32 = ctypes.windll.user32
+                    kernel32 = ctypes.windll.kernel32
+                    target = user32.FindWindowW("Fallout4", None) or last_game_hwnd[0]
+                    if not target:
+                        return
+                    fg = user32.GetForegroundWindow()
+                    fg_tid = user32.GetWindowThreadProcessId(fg, None) if fg else 0
+                    cur_tid = kernel32.GetCurrentThreadId()
+                    attached = False
+                    if fg_tid and cur_tid and fg_tid != cur_tid:
+                        attached = bool(user32.AttachThreadInput(fg_tid, cur_tid, True))
+                    user32.keybd_event(0x12, 0, 0, 0)
+                    user32.keybd_event(0x12, 0, 2, 0)
+                    user32.ShowWindow(target, 5)
+                    user32.BringWindowToTop(target)
+                    user32.SetForegroundWindow(target)
+                    if attached:
+                        user32.AttachThreadInput(fg_tid, cur_tid, False)
+                except Exception:
+                    pass
+
+            def _focus_entry(event=None) -> None:
+                try:
+                    import ctypes
+                    user32 = ctypes.windll.user32
+                    kernel32 = ctypes.windll.kernel32
+                    _record_game_hwnd()
+                    chat_win.lift()
+                    chat_hwnd = user32.GetParent(chat_win.winfo_id()) or chat_win.winfo_id()
+                    fg = user32.GetForegroundWindow()
+                    fg_tid = user32.GetWindowThreadProcessId(fg, None) if fg else 0
+                    cur_tid = kernel32.GetCurrentThreadId()
+                    attached = False
+                    if fg_tid and cur_tid and fg_tid != cur_tid:
+                        attached = bool(user32.AttachThreadInput(fg_tid, cur_tid, True))
+                    user32.keybd_event(0x12, 0, 0, 0)
+                    user32.keybd_event(0x12, 0, 2, 0)
+                    user32.ShowWindow(chat_hwnd, 5)
+                    user32.BringWindowToTop(chat_hwnd)
+                    user32.SetForegroundWindow(chat_hwnd)
+                    if attached:
+                        user32.AttachThreadInput(fg_tid, cur_tid, False)
+                    chat_win.focus_force()
+                    entry.focus_set()
+                    entry.focus_force()
+                    entry.icursor("end")
+                except Exception:
+                    try:
+                        chat_win.lift()
+                        chat_win.focus_force()
+                        entry.focus_set()
+                        entry.focus_force()
+                    except Exception:
+                        pass
+
             def _show_chat(event=None) -> None:
+                _record_game_hwnd()
                 self.chat_open = True
                 root.withdraw()
                 chat_win.deiconify()
@@ -318,6 +385,7 @@ class SubtitleHUD:
                 _focus_entry()
                 chat_win.after(60, _focus_entry)
                 chat_win.after(180, _focus_entry)
+                chat_win.after(350, _focus_entry)
 
             def _hide_chat(event=None) -> None:
                 self.chat_open = False
@@ -325,6 +393,7 @@ class SubtitleHUD:
                 if not pill_dismissed:
                     pill_win.deiconify()
                     pill_win.lift()
+                _restore_game_focus()
 
             def _toggle_compact() -> None:
                 nonlocal compact_mode
@@ -368,10 +437,10 @@ class SubtitleHUD:
 
             btn_auto = tk.Button(
                 header,
-                text=" Volver al Juego: NO ",
+                text=" Volver al Juego: SÍ ",
                 font=("Consolas", 10, "bold"),
-                fg="#26FF7E",
-                bg="#13261A",
+                fg="#08110B",
+                bg="#26FF7E",
                 activebackground="#69F0AE",
                 relief="flat",
                 command=_toggle_auto_hide,
@@ -468,9 +537,22 @@ class SubtitleHUD:
             chat_win.protocol("WM_DELETE_WINDOW", _hide_chat)
 
             hide_at = 0.0
+            f8_was_down = False
 
             def poll():
-                nonlocal hide_at
+                nonlocal hide_at, f8_was_down
+                try:
+                    import ctypes
+                    is_f8_down = bool(ctypes.windll.user32.GetAsyncKeyState(0x77) & 0x8000)
+                    if is_f8_down and not f8_was_down:
+                        if self.chat_open:
+                            _hide_chat()
+                        else:
+                            _show_chat()
+                    f8_was_down = is_f8_down
+                except Exception:
+                    pass
+
                 try:
                     while True:
                         speaker, text, dur = self._sub_queue.get_nowait()

@@ -84,6 +84,9 @@ BARKS_EN: dict[str, list[str]] = {
     "affinity_max_perk": [
         "Okey-dokey! After everything I went through with my dad Hank and Cooper Howard, you proved to me that the Golden Rule is still alive. You can count on me forever, partner!",
     ],
+    "story_intro": [
+        "I left Vault 33 in Santa Monica to rescue my dad Hank, survived The Ghoul and Maximus, and tracked your Vault 111 pod signal from New Vegas so we could team up!",
+    ],
 }
 
 _last_picked: dict[str, str] = {}

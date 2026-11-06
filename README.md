@@ -103,6 +103,7 @@ To run the mod and the local AI bridge on Windows 10/11, you only need free, ope
        ollama pull qwen2.5:3b
        ```
      - Install **[eSpeak NG](https://github.com/espeak-ng/espeak-ng/releases)** (`espeak-ng-X64.msi`) and Python dependencies (`pip install -r requirements.txt`).
+     - **Automatic Voice Model Setup (v1.2.0):** On your first run of `python start_lucy_bridge.py`, the bridge automatically downloads the official `kokoro-v1.0.int8.onnx` (`88 MB`) and `voices-v1.0.bin` (`27 MB`) files into `bridge/models/kokoro/` and plays a voice check (*"Okey-dokey, let's get to it!"*). In addition, `LucyCompanionFO4 - Main.ba2` now includes **40 native Fallout 4 `.xwm` voice lines** out of the box so Lucy always speaks in-game even before the AI bridge is started!
    - **Option B — [KoboldCpp](https://github.com/LostRuins/koboldcpp) (`127.0.0.1:5001` Unified LLM + `audio.cpp` TTS):**
      - Load any GGUF language model and enable `audio.cpp` TTS inside `koboldcpp.exe` on default port `5001`.
      - The Bridge (`companion.ini` with `llm_backend = auto` and `tts_backend = auto`, or set explicitly to `koboldcpp`) automatically connects to KoboldCpp's `/v1/chat/completions` and `/api/extra/tts` (`/v1/audio/speech`) endpoints with zero `pip` packages required!
@@ -176,10 +177,11 @@ El repositorio incluye **dos ediciones autónomas y separadas** para garantizar 
    ollama pull qwen2.5:3b
    ```
 3. **[eSpeak NG](https://github.com/espeak-ng/espeak-ng/releases):** Instala el paquete `espeak-ng-X64.msi` en su ruta por defecto (`C:\Program Files\eSpeak NG`).
-4. **Python 3.10+:** Instala las dependencias ligeras desde la raíz del repositorio:
+4. **Python 3.10+:** Instala las dependencias ligeras desde la carpeta del puente:
    ```powershell
    pip install -r requirements.txt
    ```
+   - **Descarga Automática de Voz en `v1.2.0` + 40 Líneas `.xwm` Nativas en el `.ba2`:** Al ejecutar por primera vez `python iniciar_lucy_bridge.py`, el puente descarga automáticamente los archivos oficiales `kokoro-v1.0.int8.onnx` (`88 MB`) y `voices-v1.0.bin` (`27 MB`) en `bridge/models/kokoro/` y reproduce una prueba de sonido (*«¡Oki-doki, vamos al lío!»*). Además, `LucyCompanionFO4 - Main.ba2` incorpora **40 líneas de voz `.xwm` nativas de Fallout 4** para que Lucy tenga voz dentro del juego desde el primer segundo incluso si aún no has abierto la terminal del puente de IA.
 
 ### Paso 1: Activar el Log de Usuario de Papyrus en Fallout 4
 Ejecuta una sola vez el script de configuración automática:

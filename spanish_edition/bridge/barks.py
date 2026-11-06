@@ -84,6 +84,9 @@ BARKS_ES: dict[str, list[str]] = {
     "affinity_max_perk": [
         "¡Oki-doki! Después de todo lo que sufrí con mi padre Hank y con Cooper, tú me has demostrado que la Regla de Oro sigue viva. ¡Cuenta conmigo para siempre, compañero del Refugio 111!",
     ],
+    "story_intro": [
+        "¡Salí del Refugio 33 en Santa Mónica para rescatar a mi padre Hank, sobreviví al Necrófago y seguí la señal de tu cápsula del Refugio 111 desde New Vegas para hacer equipo contigo!",
+    ],
 }
 
 _last_picked: dict[str, str] = {}

@@ -60,7 +60,7 @@ def main() -> None:
     screen_h = root.winfo_screenheight()
 
     compact_mode = True
-    auto_hide_on_send = False
+    auto_hide_on_send = True
     font_size = 16
 
     def _apply_hud_geometry() -> None:

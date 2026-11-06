@@ -102,6 +102,7 @@ Function MoveLucyToVault111Esplanade()
     endif
     LucyRef.SetEssential(true)
     LucyRef.SetProtected(true)
+    LucyRef.IgnoreFriendlyHits(true)
     LucyRef.SetPlayerTeammate(false, false, false)
     if GlobWaitMode != None
         GlobWaitMode.SetValue(1.0)
@@ -158,6 +159,11 @@ Function SetupLucyActor(bool abForceMove)
     endif
     LucyRef.SetEssential(true)
     LucyRef.SetProtected(true)
+    LucyRef.IgnoreFriendlyHits(true)
+    if LucyRef.GetCombatTarget() == kPlayer || LucyRef.IsHostileToActor(kPlayer)
+        LucyRef.StopCombat()
+        LucyRef.StopCombatAlarm()
+    endif
 
     if !IsLucyRecruited()
         LucyRef.SetPlayerTeammate(false, false, false)
@@ -169,6 +175,7 @@ Function SetupLucyActor(bool abForceMove)
     endif
 
     LucyRef.SetPlayerTeammate(true, true, true)
+    LucyRef.SetNotShowOnStealthMeter(true)
     LucyRef.AllowBleedoutDialogue(true)
 
     bool bWait = false
@@ -345,6 +352,10 @@ Function OnLucyActivated()
         return
     endif
     if !IsLucyRecruited()
+        if !bHasGreetedAtV111
+            bHasGreetedAtV111 = true
+            EmitSnapshot("v111_greeting")
+        endif
         if MesgRecruitMenu == None
             RecruitLucy()
             return
@@ -354,6 +365,7 @@ Function OnLucyActivated()
             RecruitLucy()
         elseif iChoice == 1
             if MesgStoryIntro != None
+                TriggerSnapshot("story_intro")
                 int iStoryChoice = MesgStoryIntro.Show()
                 if iStoryChoice == 0
                     RecruitLucy()
@@ -578,7 +590,65 @@ string Function BuildActorJson(Actor akPlayer, Actor akOther)
     return "{\"base_fid\":" + iBaseFID + ",\"race_fid\":" + iRaceFID + ",\"dist_m\":" + iDistM + ",\"dead\":" + BoolToJson(bDead) + ",\"in_combat\":" + BoolToJson(bCombat) + ",\"hostile\":" + BoolToJson(bHostile) + "}"
 EndFunction
 
+int Function GetBarkSoundFormID(string asEventName)
+    if asEventName == "v111_greeting"
+        return 0x0008B0
+    elseif asEventName == "recruited"
+        return 0x0008B1
+    elseif asEventName == "recruit_declined"
+        return 0x0008B2
+    elseif asEventName == "dismissed"
+        return 0x0008B3
+    elseif asEventName == "follow_me"
+        return 0x0008B4
+    elseif asEventName == "wait_here"
+        return 0x0008B5
+    elseif asEventName == "combat_start"
+        return 0x0008B6
+    elseif asEventName == "combat_end"
+        return 0x0008B7
+    elseif asEventName == "companion_hurt"
+        return 0x0008B8
+    elseif asEventName == "companion_recovered"
+        return 0x0008B9
+    elseif asEventName == "affinity_like"
+        return 0x0008BA
+    elseif asEventName == "affinity_love"
+        return 0x0008BB
+    elseif asEventName == "affinity_dislike"
+        return 0x0008BC
+    elseif asEventName == "affinity_hate"
+        return 0x0008BD
+    elseif asEventName == "affinity_max_perk"
+        return 0x0008BE
+    elseif asEventName == "story_intro"
+        return 0x0008BF
+    endif
+    return 0
+EndFunction
+
+bool Function PlayInGameBark(string asEventName)
+    int iSounFID = GetBarkSoundFormID(asEventName)
+    if iSounFID <= 0
+        return false
+    endif
+    Sound kSnd = Game.GetFormFromFile(iSounFID, "LucyCompanionFO4.esp") as Sound
+    if kSnd == None
+        return false
+    endif
+    ObjectReference kSource = LucyRef
+    if kSource == None
+        kSource = Game.GetPlayer()
+    endif
+    if kSource != None
+        int iInst = kSnd.Play(kSource)
+        return iInst != 0
+    endif
+    return false
+EndFunction
+
 Function EmitSnapshot(string asEventName)
+    bool bVoicedInGame = PlayInGameBark(asEventName)
     Actor kPlayer = Game.GetPlayer()
     if kPlayer == None
         return
@@ -697,7 +767,7 @@ Function EmitSnapshot(string asEventName)
     string sPlayerJson = "{\"hp\":" + iPlayerHP + ",\"in_combat\":" + BoolToJson(bPlayerCombat) + ",\"sneaking\":" + BoolToJson(bPlayerSneak) + ",\"in_power_armor\":" + BoolToJson(bPlayerPA) + ",\"weapon_fid\":" + iWeapFID + "}"
     string sCompJson = "{\"hp\":" + iLucyHP + ",\"in_combat\":" + BoolToJson(bLucyCombat) + ",\"bleedout\":" + BoolToJson(bLucyBleed) + ",\"distance_m\":" + iLucyDistM + ",\"recruited\":" + BoolToJson(bRecruited) + ",\"affinity\":" + iAffinity + ",\"stance\":\"" + sStance + "\"}"
 
-    string sJson = "{\"event\":\"" + asEventName + "\",\"game_hour\":\"" + sGameHour + "\",\"loc_fid\":" + iLocFID + ",\"cell_fid\":" + iCellFID + ",\"ws_fid\":" + iWSFID + ",\"interior\":" + BoolToJson(bInterior) + ",\"weather_fid\":" + iWthrFID + ",\"weather_class\":" + iWthrClass + ",\"player\":" + sPlayerJson + ",\"companion\":" + sCompJson + ",\"nearby_raw\":[" + sNearby + "]}"
+    string sJson = "{\"event\":\"" + asEventName + "\",\"voiced_ingame\":" + BoolToJson(bVoicedInGame) + ",\"game_hour\":\"" + sGameHour + "\",\"loc_fid\":" + iLocFID + ",\"cell_fid\":" + iCellFID + ",\"ws_fid\":" + iWSFID + ",\"interior\":" + BoolToJson(bInterior) + ",\"weather_fid\":" + iWthrFID + ",\"weather_class\":" + iWthrClass + ",\"player\":" + sPlayerJson + ",\"companion\":" + sCompJson + ",\"nearby_raw\":[" + sNearby + "]}"
 
     Debug.TraceUser("LucyCompanionBridge", "[LUCY_SNAPSHOT] " + sJson)
 EndFunction

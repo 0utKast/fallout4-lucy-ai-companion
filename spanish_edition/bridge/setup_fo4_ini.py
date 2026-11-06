@@ -17,10 +17,17 @@ def _enable_papyrus_in_file(custom_ini: Path) -> None:
         except Exception:
             cfg.read(custom_ini, encoding="latin-1")
 
+    if "General" not in cfg:
+        cfg["General"] = {}
+
     if "Papyrus" not in cfg:
         cfg["Papyrus"] = {}
 
     changed = False
+    if cfg["General"].get("bAlwaysActive") != "1":
+        cfg["General"]["bAlwaysActive"] = "1"
+        changed = True
+
     for key in ("bEnableLogging", "bEnableTrace", "bLoadDebugInformation"):
         if cfg["Papyrus"].get(key) != "1":
             cfg["Papyrus"][key] = "1"
@@ -29,9 +36,9 @@ def _enable_papyrus_in_file(custom_ini: Path) -> None:
     if changed or not custom_ini.exists():
         with custom_ini.open("w", encoding="utf-8") as f:
             cfg.write(f, space_around_delimiters=False)
-        print(f"[INI] Activado soporte de logs Papyrus en {custom_ini}", flush=True)
+        print(f"[INI] Activado soporte Papyrus y bAlwaysActive=1 (el juego no se pausa al abrir el Chat HUD) en {custom_ini}", flush=True)
     else:
-        print(f"[INI] Soporte de logs Papyrus ya estaba activo en {custom_ini}", flush=True)
+        print(f"[INI] Soporte Papyrus y bAlwaysActive=1 ya estaban activos en {custom_ini}", flush=True)
 
 
 def _ensure_borderless_in_prefs(prefs_ini: Path) -> None:

@@ -191,7 +191,10 @@ def process_snapshot(
             speaker_name = personas.current()["name"]
             if hud:
                 hud.show(speaker_name, bark_text)
-            ttfa_b = voice.play_bark_fast(bark_text, distance_m=dist) if voice else 0.0
+            if snapshot.get("voiced_ingame"):
+                ttfa_b = 0.0
+            else:
+                ttfa_b = voice.play_bark_fast(bark_text, distance_m=dist) if voice else 0.0
             last_comment_at = time.monotonic()
             mood_map = {
                 "combat_start": "alert",
